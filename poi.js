@@ -9,7 +9,7 @@ window.POI = (() => {
     "https://overpass.kumi.systems/api/interpreter",
   ];
   const KEY = "gps-mangas-poi";
-  const RADIUS = 6000;                 // ακτίνα κάθε περιοχής (μέτρα)
+  const RADIUS = 5000;                 // μισό πλάτος του τετραγώνου κάθε περιοχής (μέτρα)
   const REFRESH_DIST = 2500;           // ξανακατέβασμα όταν απομακρυνθείς τόσο από το κέντρο της
   const MAX_AGE = 3 * 24 * 3600e3;     // ανανέωση κάθε 3 μέρες
   const RETRY_AFTER = 60e3;            // μετά από αποτυχία, ξαναδοκιμή σε 1 λεπτό
@@ -68,13 +68,17 @@ window.POI = (() => {
     return bits.join(" · ");
   }
 
+  // Τετράγωνο γύρω από τη θέση: πολύ πιο ελαφρύ για τον διακομιστή από τον «κύκλο» (around).
+  function bbox(pos, radius) {
+    const dLat = radius / 111320;
+    const dLng = radius / (111320 * Math.cos((pos.lat * Math.PI) / 180));
+    return [pos.lat - dLat, pos.lng - dLng, pos.lat + dLat, pos.lng + dLng].map((x) => x.toFixed(5)).join(",");
+  }
+
   async function query(cats, pos, radius) {
-    const parts = cats
-      .flatMap((c) => CATS[c][2])
-      .map((f) => `nwr${f}(around:${radius},${pos.lat.toFixed(5)},${pos.lng.toFixed(5)});`)
-      .join("");
-    const q = `[out:json][timeout:25];(${parts});out tags center qt;`;
-    const data = await Net.json(SERVERS, { method: "POST", body: new URLSearchParams({ data: q }) }, 25000);
+    const parts = cats.flatMap((c) => CATS[c][2]).map((f) => `nwr${f};`).join("");
+    const q = `[out:json][timeout:20][bbox:${bbox(pos, radius)}];(${parts});out center;`;
+    const data = await Net.json(SERVERS, { method: "POST", body: new URLSearchParams({ data: q }) }, 15000);
     const items = [];
     for (const el of data.elements || []) {
       const lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon;
@@ -137,6 +141,36 @@ window.POI = (() => {
     return nearby(cat, pos);
   }
 
+  // Γρήγορη απάντηση (~1″) από το Nominatim όσο κατεβαίνει η πλήρης περιοχή,
+  // ή εναλλακτική όταν οι διακομιστές Overpass δεν απαντούν.
+  const KEYWORDS = {
+    fuel: "fuel", food: "restaurant", cafe: "cafe", market: "supermarket", pharmacy: "pharmacy",
+    parking: "parking", atm: "atm", ev: "charging station", hotel: "hotel", hospital: "hospital",
+    carwash: "car wash", repair: "car repair", wc: "toilets",
+  };
+  async function quick(cat, pos) {
+    const d = 0.12; // ~13 χλμ
+    const params = new URLSearchParams({
+      q: KEYWORDS[cat], format: "jsonv2", limit: "40", bounded: "1",
+      viewbox: [pos.lng - d, pos.lat + d, pos.lng + d, pos.lat - d].map((x) => x.toFixed(4)).join(","),
+    });
+    const data = await Net.json(`https://nominatim.openstreetmap.org/search?${params}`, {}, 8000);
+    const items = [];
+    for (const r of data || []) {
+      const tags = { [r.category]: r.type };
+      if (!CATS[cat][3](tags)) continue;
+      const parts = (r.display_name || "").split(",").map((x) => x.trim());
+      const name = r.name || CATS[cat][0];
+      const sub = parts.filter((x) => x && x !== name).slice(0, 2).join(", ");
+      items.push([cat, +(+r.lat).toFixed(6), +(+r.lon).toFixed(6), name, sub]);
+    }
+    if (items.length) {
+      areas = [...areas, { lat: pos.lat, lng: pos.lng, r: 13000, ts: Date.now(), partial: "quick", items }].slice(-(MAX_AREAS + 6));
+      save();
+    }
+    return items.length;
+  }
+
   // Έχουμε ήδη ψάξει μακρύτερα για αυτή την κατηγορία εδώ γύρω;
   function searchedWide(cat, pos) {
     const now = Date.now();
@@ -177,6 +211,7 @@ window.POI = (() => {
     refresh,
     liveSearch,
     searchedWide,
+    quick,
     nearby,
     find,
     normalize,

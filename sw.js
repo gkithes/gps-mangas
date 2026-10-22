@@ -1,6 +1,6 @@
 // Service worker: η εφαρμογή ανοίγει αμέσως από τη μνήμη του κινητού
 // και ενημερώνεται στο παρασκήνιο. Κρατάει και τα κομμάτια του χάρτη που έχεις δει.
-const CACHE = "gps-mangas-v5";
+const CACHE = "gps-mangas-v6";
 const TILES = "gps-mangas-tiles";
 const MAX_TILES = 1500;
 const FILES = ["./", "index.html", "style.css", "app.js", "phrases.js", "recordings.js", "places.js", "poi.js", "net.js", "vendor/NoSleep.min.js", "vendor/leaflet/leaflet.js", "vendor/leaflet/leaflet.css", "manifest.json", "icon.svg"];

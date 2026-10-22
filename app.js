@@ -30,6 +30,7 @@ const CATEGORIES = {
 };
 
 const $ = (id) => document.getElementById(id);
+const bootTime = Date.now();
 
 // Το iPhone να μη μεγεθύνει τη σελίδα με τσίμπημα (ο χάρτης ζουμάρει κανονικά).
 document.addEventListener("gesturestart", (e) => e.preventDefault());
@@ -210,6 +211,7 @@ function setMode(mode) {
   $("navbar").hidden = mode !== "nav";
   $("banner").hidden = mode !== "nav";
   document.body.classList.toggle("navigating", mode === "nav");
+  if (typeof renderLocate === "function") renderLocate();
   if (mode !== "places") {
     poiLayer.clearLayers();
     document.querySelectorAll(".chip.on").forEach((c) => c.classList.remove("on"));
@@ -569,10 +571,61 @@ function arrowSvg(step) {
 
 // ---------- αναζήτηση ----------
 
+// Η θέση σου για αναζητήσεις: η τωρινή από το GPS, αλλιώς η τελευταία γνωστή.
+// Ποτέ το κέντρο του χάρτη — αλλιώς ψάχνει στην άλλη άκρη του κόσμου.
 function origin() {
-  if (state.pos) return state.pos;
-  const c = map.getCenter();
-  return { lat: c.lat, lng: c.lng, speed: null, accuracy: 0 };
+  return state.pos || lastKnown || null;
+}
+
+function renderLocate() {
+  // στα πρώτα 4″ δίνουμε χρόνο στο GPS πριν δείξουμε το κόκκινο κουμπί
+  const early = Date.now() - bootTime < 4000 && !state.gpsDenied;
+  $("locate").hidden = !!state.pos || state.mode === "nav" || early;
+}
+
+// Ζητάει την τοποθεσία μετά από πάτημα (έτσι το iPhone δείχνει το παράθυρο άδειας).
+function requestLocation() {
+  if (!("geolocation" in navigator)) return locationHelp();
+  state.gpsDenied = false;
+  toast("Ψάχνω πού είσαι…");
+  navigator.geolocation.getCurrentPosition(
+    (p) => {
+      onFix(p);
+      startGps();
+    },
+    (e) => {
+      if (state.pos) return; // στο μεταξύ ήρθε θέση από το άλλο κανάλι
+      locationHelp(e.code === 1);
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+}
+
+function locationHelp(denied = true) {
+  $("actions-title").innerHTML = `<p><b>${denied ? "Η εφαρμογή δεν έχει άδεια για την τοποθεσία σου." : "Δεν βρίσκω την τοποθεσία σου."}</b></p>
+    <p>Στο iPhone: <b>Ρυθμίσεις → Απόρρητο & Ασφάλεια → Υπηρεσίες τοποθεσίας</b> (ανοιχτό) → <b>Ιστότοποι Safari</b> → «Κατά τη χρήση» και «Ακριβής τοποθεσία».</p>
+    ${denied ? "" : "<p>Αν η άδεια είναι ήδη εντάξει, βγες σε ανοιχτό χώρο (μακριά από κτίρια) και ξαναδοκίμασε.</p>"}
+    <p>Μετά κλείσε τελείως την εφαρμογή και άνοιξέ την ξανά.</p>`;
+  const box = $("actions-buttons");
+  box.innerHTML = "";
+  const b = document.createElement("button");
+  b.className = "pill";
+  b.textContent = "🔄  Δοκίμασε ξανά";
+  b.onclick = () => {
+    $("actions").hidden = true;
+    requestLocation();
+  };
+  box.appendChild(b);
+  $("actions").hidden = false;
+}
+$("locate").onclick = requestLocation;
+
+// Αν δεν ξέρουμε καθόλου πού είσαι, το λέμε αντί να ψάξουμε λάθος μέρος.
+function needLocation(where) {
+  if (origin()) return false;
+  where.innerHTML = '<li class="empty">📍 Δεν ξέρω πού είσαι. Πάτα το κόκκινο κουμπί για να ενεργοποιήσεις την τοποθεσία.</li>';
+  renderLocate();
+  return true;
 }
 
 function placeRow(icon, name, sub, right) {
@@ -593,28 +646,94 @@ function photonToPlace(f) {
   return { lat, lng, name, sub };
 }
 
+const NEAR_BOX = 0.6; // ~65 χλμ γύρω σου: εκεί ψάχνουμε πρώτα
+
+// Πιο κοντινά πρώτα· αν υπάρχει κάτι κοντά, τα πολύ μακρινά (άλλη χώρα) πετιούνται.
+function byDistance(list, from) {
+  const withD = list.map((p) => ({ ...p, d: haversine([from.lat, from.lng], [p.lat, p.lng]) })).sort((a, b) => a.d - b.d);
+  if (withD.length && withD[0].d < 100000) return withD.filter((p) => p.d < 500000);
+  return withD;
+}
+
 async function searchPhoton(q, from, signal, limit = 8) {
-  const params = new URLSearchParams({ q, limit: String(limit), lat: from.lat.toFixed(4), lon: from.lng.toFixed(4) });
-  const data = await Net.json(`${PHOTON}?${params}`, { signal }, 6000);
-  return (data.features || []).map(photonToPlace);
+  const run = async (bounded) => {
+    const params = new URLSearchParams({ q, limit: String(limit) });
+    if (from) {
+      params.set("lat", from.lat.toFixed(4));
+      params.set("lon", from.lng.toFixed(4));
+      if (bounded) params.set("bbox", [from.lng - NEAR_BOX, from.lat - NEAR_BOX, from.lng + NEAR_BOX, from.lat + NEAR_BOX].map((x) => x.toFixed(4)).join(","));
+    }
+    const data = await Net.json(`${PHOTON}?${params}`, { signal }, 6000);
+    return (data.features || []).map(photonToPlace);
+  };
+  let res = from ? await run(true) : [];
+  if (res.length < 3) res = [...res, ...(await run(false))];
+  return from ? byDistance(res, from) : res;
 }
 
 async function searchNominatim(q, from, signal) {
-  const d = 1.5;
-  const params = new URLSearchParams({
-    q, format: "json", limit: "8", "accept-language": "el",
-    viewbox: [from.lng - d, from.lat + d, from.lng + d, from.lat - d].join(","),
-  });
-  const data = await Net.json(`${NOMINATIM}?${params}`, { signal }, 8000);
-  return data.map((r) => {
-    const [first, ...rest] = r.display_name.split(",");
-    return { lat: +r.lat, lng: +r.lon, name: first.trim(), sub: rest.join(",").trim() };
-  });
+  const run = async (bounded) => {
+    const params = new URLSearchParams({ q, format: "json", limit: "8" });
+    if (from) {
+      params.set("viewbox", [from.lng - NEAR_BOX, from.lat + NEAR_BOX, from.lng + NEAR_BOX, from.lat - NEAR_BOX].map((x) => x.toFixed(4)).join(","));
+      if (bounded) params.set("bounded", "1");
+    }
+    const data = await Net.json(`${NOMINATIM}?${params}`, { signal }, 8000);
+    return data.map((r) => {
+      const [first, ...rest] = r.display_name.split(",");
+      return { lat: +r.lat, lng: +r.lon, name: first.trim(), sub: rest.join(",").trim() };
+    });
+  };
+  let res = from ? await run(true) : [];
+  if (!res.length) res = await run(false);
+  return from ? byDistance(res, from) : res;
+}
+
+// «βενζίνη», «gas near me», «φαρμακείο κοντά μου»… → ανοίγει τα κοντινά της κατηγορίας.
+const NEAR_WORDS = /\b(near me|nearby|near by|around me|close to me|closest|nearest)\b|κοντα μου|κοντινο|κοντινα|κοντινοτερ|εδω γυρω|πλησιεστερ/g;
+const INTENTS = {
+  fuel: ["gas", "fuel", "petrol", "βενζιν", "πρατηρι", "καυσιμ", "πετρελαι"],
+  food: ["restaurant", "food", "eat", "pizza", "burger", "diner", "εστιατορ", "ταβερν", "φαγητ", "φαι", "σουβλακ", "πιτσ", "ψησταρι"],
+  cafe: ["cafe", "coffee", "καφε", "καφετερ"],
+  market: ["supermarket", "grocery", "market", "σουπερ", "μαρκετ", "παντοπωλ"],
+  pharmacy: ["pharmacy", "drugstore", "φαρμακ"],
+  parking: ["parking", "παρκιν", "σταθμευσ"],
+  atm: ["atm", "bank", "αταμ", "τραπεζ"],
+  ev: ["charging", "charger", "φορτισ"],
+  hotel: ["hotel", "motel", "ξενοδοχ"],
+  hospital: ["hospital", "clinic", "urgent care", "νοσοκομ", "κλινικ"],
+  carwash: ["car wash", "πλυντηρ"],
+  repair: ["mechanic", "repair", "tire", "tyre", "συνεργ", "βουλκαν", "λαστιχ"],
+  wc: ["toilet", "restroom", "bathroom", "τουαλετ"],
+};
+// Επιστρέφει { key, strong }: strong = σίγουρα ζητάει «κοντά μου» (π.χ. «βενζίνη», «gas near me»),
+// οπότε το «Πάμε» ανοίγει κατευθείαν τη λίστα· αλλιώς (π.χ. «Market Street») απλώς προτείνεται.
+function nearbyIntent(q) {
+  const norm = POI.normalize(q);
+  const asked = NEAR_WORDS.test(norm);
+  NEAR_WORDS.lastIndex = 0;
+  const rest = norm.replace(NEAR_WORDS, " ").replace(/\b(stations?|a|the|any)\b/g, " ").replace(/\s+/g, " ").trim();
+  NEAR_WORDS.lastIndex = 0;
+  if (!rest) return null;
+  const words = rest.split(" ").length;
+  if (!asked && words > 2) return null;
+  for (const [key, stems] of Object.entries(INTENTS)) {
+    if (stems.some((st) => rest.startsWith(st) || rest.includes(" " + st))) return { key, strong: asked || words === 1 };
+  }
+  return null;
+}
+
+function openNearby(key) {
+  $("dest").value = "";
+  $("results").innerHTML = "";
+  $("dest").blur();
+  showNearby(key, document.querySelector(`.chip[data-key="${key}"]`));
 }
 
 // Άμεσες προτάσεις από ό,τι υπάρχει ήδη στο κινητό: αγαπημένα, πρόσφατα, κοντινά μέρη.
 function localSuggestions(q, from) {
   const norm = POI.normalize(q);
+  if (!from) from = { lat: 0, lng: 0 };
   const out = [];
   const seen = new Set();
   const add = (icon, p) => {
@@ -637,6 +756,12 @@ function renderResults(q, local, remote, { loading = false, header = "" } = {}) 
   const list = $("results");
   const from = origin();
   list.innerHTML = "";
+  if (!from) {
+    const h = document.createElement("li");
+    h.className = "head";
+    h.textContent = "📍 Δεν ξέρω πού είσαι — τα αποτελέσματα μπορεί να μην είναι κοντά σου";
+    list.appendChild(h);
+  }
   if (header) {
     const h = document.createElement("li");
     h.className = "head";
@@ -648,7 +773,7 @@ function renderResults(q, local, remote, { loading = false, header = "" } = {}) 
     const k = `${(+place.lat).toFixed(3)},${(+place.lng).toFixed(3)}|${POI.normalize(place.name)}`;
     if (seen.has(k)) return;
     seen.add(k);
-    const li = placeRow(icon, place.name, place.sub, fmtShort(haversine([from.lat, from.lng], [place.lat, place.lng])));
+    const li = placeRow(icon, place.name, place.sub, from ? fmtShort(haversine([from.lat, from.lng], [place.lat, place.lng])) : "");
     li.onclick = () => {
       $("dest").value = "";
       list.innerHTML = "";
@@ -656,6 +781,14 @@ function renderResults(q, local, remote, { loading = false, header = "" } = {}) 
     };
     list.appendChild(li);
   };
+  const intent = nearbyIntent(q);
+  if (intent) {
+    const [label, icon] = POI.CATS[intent.key];
+    const li = placeRow(icon, `${label} κοντά σου`, "Όλα τα κοντινά, πιο κοντινά πρώτα", "");
+    li.classList.add("intent");
+    li.onclick = () => openNearby(intent.key);
+    list.appendChild(li);
+  }
   for (const s of local) addRow(s.icon, s.place);
   for (const p of remote) addRow("📍", p);
   if (loading) {
@@ -664,6 +797,7 @@ function renderResults(q, local, remote, { loading = false, header = "" } = {}) 
     li.textContent = "Ψάχνω…";
     list.appendChild(li);
   } else if (!list.querySelector("li:not(.head)")) {
+    list.innerHTML = "";
     list.innerHTML = `<li class="empty">Δεν βρήκα «${escapeHtml(q)}». Γράψ' το σωστά, ρε!</li>`;
   }
 }
@@ -702,6 +836,8 @@ $("search").addEventListener("submit", async (e) => {
   clearTimeout(suggestTimer);
   if (suggestAbort) suggestAbort.abort();
   if (!q) return;
+  const intent = nearbyIntent(q);
+  if (intent && intent.strong) return openNearby(intent.key); // «βενζίνη κοντά μου» → κατευθείαν η λίστα
   const from = origin();
   const header = `Αποτελέσματα για «${q}»`;
   const local = localSuggestions(q, from);
@@ -767,6 +903,7 @@ async function showNearby(key, chip) {
   chip.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
   $("places-title").textContent = `${icon} ${label} κοντά σου`;
   const from = origin();
+  if (needLocation($("places-list"))) return;
   const stillHere = () => state.mode === "places" && chip.classList.contains("on");
 
   // 1) αμέσως ό,τι έχουμε στο κινητό
@@ -776,7 +913,17 @@ async function showNearby(key, chip) {
   renderNearby(key, items, !fresh || !wideDone);
   if (fresh && wideDone) return;
 
-  // 2) ανανέωση της περιοχής στο παρασκήνιο, 3) αν είναι ακόμα λίγα, ψάξε πιο μακριά
+  // 2) γρήγορη απάντηση σε ~1″ όσο κατεβαίνει ολόκληρη η περιοχή
+  let quickDone = Promise.resolve();
+  if (!fresh) {
+    quickDone = POI.quick(key, from)
+      .then(() => {
+        if (stillHere() && !POI.isFresh(from)) renderNearby(key, POI.nearby(key, from), true);
+      })
+      .catch(() => {});
+  }
+
+  // 3) ανανέωση της περιοχής, 4) αν είναι ακόμα λίγα, ψάξε πιο μακριά
   try {
     if (!fresh) await POI.refresh(from, { force: true });
     if (!stillHere()) return;
@@ -786,6 +933,7 @@ async function showNearby(key, chip) {
       items = await POI.liveSearch(key, from);
     }
   } catch {
+    await quickDone;
     if (!stillHere()) return;
     items = POI.nearby(key, from);
     if (!items.length) {
@@ -970,6 +1118,11 @@ async function previewDestination(dest) {
   if (destMarker) destMarker.remove();
   destMarker = L.marker([state.dest.lat, state.dest.lng], { icon: destIcon }).addTo(map);
   const want = state.dest;
+  if (!state.pos && !lastKnown) {
+    $("route-list").innerHTML = '<li class="empty">📍 Χρειάζομαι την τοποθεσία σου για να βρω διαδρομή. Πάτα «Δεν ξέρω πού είσαι» πάνω.</li>';
+    renderLocate();
+    return;
+  }
 
   let routes;
   try {
@@ -1163,6 +1316,7 @@ function onPosition(pos) {
   userMarker.setLatLng(here);
   if (!map.hasLayer(userMarker)) userMarker.addTo(map);
   if (first && state.mode === "home") map.setView(here, 16);
+  if (first) renderLocate();
   saveLastPos(pos);
   if (!state.navigating) POI.refresh(pos).catch(() => {}); // κοντινά μέρη στο παρασκήνιο
   if (state.navigating && state.route) safe(() => guide(pos));
@@ -1327,8 +1481,9 @@ function onFix(p) {
 function onGpsError(e) {
   if (e.code === 1) {
     state.gpsDenied = true;
-    toast("Δώσε άδεια τοποθεσίας: Ρυθμίσεις → Απόρρητο → Υπηρεσίες τοποθεσίας → Safari");
+    toast("Δεν έχω άδεια τοποθεσίας — πάτα το κόκκινο κουμπί πάνω");
   }
+  renderLocate();
   // για τα υπόλοιπα (χάθηκε σήμα, timeout) ο φύλακας κάνει επανεκκίνηση
 }
 
@@ -1601,6 +1756,7 @@ $("rec-file").onchange = async (e) => {
 
 Recordings.load();
 setMode("home");
+setTimeout(renderLocate, 4000); // αν σε 4″ δεν έχει έρθει θέση, δείξε το κουμπί
 renderDrawer();
 startGps();
 // κοντινά μέρη για την τελευταία γνωστή θέση, πριν καν απαντήσει το GPS
