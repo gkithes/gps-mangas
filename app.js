@@ -7,10 +7,50 @@ const NOMINATIM = "https://nominatim.openstreetmap.org/search";
 const ANNOUNCE_FAR_M = 250;   // "Σε 200 μέτρα..."
 const ANNOUNCE_NEAR_M = 45;   // εδώ πέφτει η ατάκα
 const OFF_ROUTE_M = 60;
-const SPEEDING_KMH = 120;
 const IDLE_SECONDS = 90;
 
+const CATEGORIES = {
+  start: "Ξεκίνημα",
+  left: "Αριστερά",
+  right: "Δεξιά",
+  straight: "Ευθεία",
+  uturn: "Αναστροφή",
+  roundabout: "Κυκλικός κόμβος",
+  highway: "Εθνική / ράμπες",
+  recalc: "Λάθος δρόμος",
+  speeding: "Τρέχεις",
+  idle: "Ακινησία",
+  arrive: "Άφιξη",
+};
+
 const $ = (id) => document.getElementById(id);
+
+// ---------- ρυθμίσεις ----------
+
+const DEFAULTS = {
+  voiceURI: "",
+  rate: 1,
+  pitch: 1,
+  volume: 1,
+  mode: "both",     // both | quips | plain | mute
+  lang: "el",       // el | pnt | mix
+  chime: true,
+  speedLimit: 120,
+  myAudio: "mix",   // mix | only | off
+};
+
+const settings = { ...DEFAULTS };
+try {
+  Object.assign(settings, JSON.parse(localStorage.getItem("gps-mangas-settings") || "{}"));
+} catch {}
+
+function saveSettings() {
+  try {
+    localStorage.setItem("gps-mangas-settings", JSON.stringify(settings));
+  } catch {}
+}
+
+// ---------- χάρτης ----------
 
 const map = L.map("map", { zoomControl: false }).setView([37.9838, 23.7275], 13);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -20,6 +60,12 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 
 const userMarker = L.circleMarker([0, 0], {
   radius: 9, color: "#fff", weight: 3, fillColor: "#2a7de1", fillOpacity: 1,
+});
+const destIcon = L.divIcon({
+  className: "dest-pin",
+  html: '<svg viewBox="0 0 32 44" width="32" height="44"><path d="M16 1C7.7 1 1 7.6 1 15.8 1 27 16 43 16 43s15-16 15-27.2C31 7.6 24.3 1 16 1z" fill="#e5484d" stroke="#fff" stroke-width="2"/><circle cx="16" cy="16" r="5.5" fill="#fff"/></svg>',
+  iconSize: [32, 44],
+  iconAnchor: [16, 43],
 });
 let destMarker = null;
 let routeLine = null;
@@ -37,48 +83,171 @@ const state = {
   stillSince: null,
   lastIdleWarn: 0,
   navigating: false,
+  follow: true,
   simTimer: null,
   wakeLock: null,
   lastPicked: {},
 };
 
-// ---------- φωνή ----------
+map.on("dragstart", () => {
+  if (!state.navigating && !state.pos) return;
+  state.follow = false;
+  $("recenter").hidden = false;
+});
+$("recenter").onclick = () => {
+  state.follow = true;
+  $("recenter").hidden = true;
+  if (state.pos) map.setView([state.pos.lat, state.pos.lng], Math.max(map.getZoom(), 16));
+};
 
-let greekVoice = null;
-function loadVoice() {
-  const voices = speechSynthesis.getVoices();
-  greekVoice = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith("el")) || null;
+function toast(text) {
+  $("toast").textContent = text;
+  $("toast").hidden = false;
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => ($("toast").hidden = true), 2500);
+}
+
+// ---------- ήχος ----------
+
+let audioCtx = null;
+const player = new Audio();
+player.playsInline = true;
+
+// Το iPhone παίζει ήχο μόνο αφού ο χρήστης αγγίξει κάτι. Ξεκλειδώνουμε με το πρώτο άγγιγμα.
+function unlockAudio() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    audioCtx.resume();
+  } catch {}
+  player.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+  player.play().catch(() => {});
+  if ("speechSynthesis" in window) speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+  document.removeEventListener("pointerdown", unlockAudio);
+}
+document.addEventListener("pointerdown", unlockAudio);
+
+function chime() {
+  if (!settings.chime || !audioCtx) return;
+  const t = audioCtx.currentTime;
+  [880, 1320].forEach((f, i) => {
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.frequency.value = f;
+    g.gain.setValueAtTime(0, t + i * 0.12);
+    g.gain.linearRampToValueAtTime(0.25 * settings.volume, t + i * 0.12 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.12 + 0.25);
+    o.connect(g).connect(audioCtx.destination);
+    o.start(t + i * 0.12);
+    o.stop(t + i * 0.12 + 0.3);
+  });
+}
+
+let voices = [];
+function loadVoices() {
+  voices = speechSynthesis.getVoices();
+  const sel = $("s-voice");
+  const greek = voices.filter((v) => v.lang && v.lang.toLowerCase().startsWith("el"));
+  const others = voices.filter((v) => !greek.includes(v));
+  sel.innerHTML = '<option value="">Αυτόματα (ελληνική)</option>';
+  const addGroup = (label, list) => {
+    if (!list.length) return;
+    const g = document.createElement("optgroup");
+    g.label = label;
+    for (const v of list) {
+      const o = document.createElement("option");
+      o.value = v.voiceURI;
+      o.textContent = `${v.name} (${v.lang})`;
+      g.appendChild(o);
+    }
+    sel.appendChild(g);
+  };
+  addGroup("Ελληνικές", greek);
+  addGroup("Άλλες γλώσσες", others);
+  sel.value = settings.voiceURI;
+  if (sel.value !== settings.voiceURI) sel.value = "";
+  $("voice-hint").hidden = greek.length > 1;
 }
 if ("speechSynthesis" in window) {
-  loadVoice();
-  speechSynthesis.onvoiceschanged = loadVoice;
+  loadVoices();
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+function currentVoice() {
+  return (
+    voices.find((v) => v.voiceURI === settings.voiceURI) ||
+    voices.find((v) => v.lang && v.lang.toLowerCase().startsWith("el")) ||
+    null
+  );
+}
+
+function stopSound() {
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  player.pause();
 }
 
 function speak(text, interrupt = false) {
-  if (!("speechSynthesis" in window)) return;
-  if (interrupt) speechSynthesis.cancel();
+  if (settings.mode === "mute" || !text || !("speechSynthesis" in window)) return;
+  if (interrupt) stopSound();
+  chime();
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = "el-GR";
-  if (greekVoice) u.voice = greekVoice;
-  u.rate = 1.0;
+  const v = currentVoice();
+  u.lang = v ? v.lang : "el-GR";
+  if (v) u.voice = v;
+  u.rate = settings.rate;
+  u.pitch = settings.pitch;
+  u.volume = settings.volume;
   speechSynthesis.speak(u);
+}
+
+function playClip(clip, interrupt = true) {
+  if (settings.mode === "mute") return;
+  if (interrupt) stopSound();
+  chime();
+  if (player.dataset.url) URL.revokeObjectURL(player.dataset.url);
+  const url = URL.createObjectURL(clip.blob);
+  player.dataset.url = url;
+  player.src = url;
+  player.volume = settings.volume;
+  setTimeout(() => player.play().catch(() => {}), settings.chime ? 350 : 0);
 }
 
 // ---------- ατάκες ----------
 
+// Διαλέγει ατάκα: γραπτή (θα τη διαβάσει η φωνή) ή δική σου ηχογράφηση.
 function pick(category) {
-  const lang = $("lang").value;
   const set = window.PHRASES[category] || { el: [] };
-  let list;
-  if (lang === "mix") list = [...(set.el || []), ...(set.pnt || [])];
-  else list = set[lang] && set[lang].length ? set[lang] : set.el || [];
-  if (!list.length) return "";
+  let texts;
+  if (settings.lang === "mix") texts = [...(set.el || []), ...(set.pnt || [])];
+  else texts = set[settings.lang] && set[settings.lang].length ? set[settings.lang] : set.el || [];
+
+  const clips = settings.myAudio === "off" ? [] : Recordings.forCategory(category);
+  let pool;
+  if (settings.myAudio === "only" && clips.length) pool = clips.map((c) => ({ clip: c }));
+  else pool = [...texts.map((t) => ({ text: t })), ...clips.map((c) => ({ clip: c }))];
+  if (!pool.length) return { text: "" };
+
   let p;
   do {
-    p = list[Math.floor(Math.random() * list.length)];
-  } while (list.length > 1 && p === state.lastPicked[category]);
-  state.lastPicked[category] = p;
+    p = pool[Math.floor(Math.random() * pool.length)];
+  } while (pool.length > 1 && (p.text || p.clip.id) === state.lastPicked[category]);
+  state.lastPicked[category] = p.text || p.clip.id;
   return p;
+}
+
+// Λέει την ατάκα της κατηγορίας. Στο «σοβαρό» λέει μόνο την κανονική οδηγία.
+// Επιστρέφει το κείμενο που δείχνει η κάρτα.
+function quip(category, plainText, interrupt = true) {
+  if (settings.mode === "plain") {
+    if (plainText) speak(plainText, interrupt);
+    return "";
+  }
+  const p = pick(category);
+  if (p.clip) {
+    playClip(p.clip, interrupt);
+    return "🎙 " + (p.clip.name || CATEGORIES[category]);
+  }
+  speak(p.text, interrupt);
+  return p.text;
 }
 
 // ---------- γεωμετρία ----------
@@ -117,6 +286,11 @@ function fmtDist(m) {
   return Math.round(m / 10) * 10 + " μέτρα";
 }
 
+function fmtShort(m) {
+  if (m >= 1000) return (m / 1000).toFixed(1).replace(".", ",") + " χλμ";
+  return Math.round(m / 10) * 10 + " μ";
+}
+
 // ---------- οδηγίες ----------
 
 const MOD = {
@@ -130,12 +304,17 @@ const MOD = {
   uturn: "αναστροφή",
 };
 
+const ANGLE = {
+  straight: 0, "slight right": 45, right: 90, "sharp right": 135,
+  "slight left": -45, left: -90, "sharp left": -135,
+};
+
 function category(step) {
   const t = step.type, m = step.modifier || "";
   if (t === "arrive") return "arrive";
   if (t.includes("roundabout") || t.includes("rotary")) return "roundabout";
   if (m === "uturn") return "uturn";
-  if ((t === "on ramp" || t === "off ramp" || t === "merge") && window.PHRASES.highway.el.length) return "highway";
+  if (t === "on ramp" || t === "off ramp" || t === "merge") return "highway";
   if (m.includes("left")) return "left";
   if (m.includes("right")) return "right";
   return "straight";
@@ -162,12 +341,27 @@ function instruction(step) {
   }
 }
 
+// Εικονίδιο βέλους για την κάρτα.
+function arrowSvg(step) {
+  const s = 'fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"';
+  if (!step) return "";
+  if (step.type === "arrive")
+    return `<path d="M14 42V8M14 9h20l-5 7 5 7H14" ${s}/>`;
+  if (step.type.includes("roundabout") || step.type.includes("rotary"))
+    return `<circle cx="24" cy="20" r="8" ${s}/><path d="M24 44V28M30 14l6-6M30 8h6v6" ${s}/>`;
+  if (step.modifier === "uturn")
+    return `<path d="M30 42V18a8 8 0 0 0-16 0v10M8 22l6 7 6-7" ${s}/>`;
+  const a = ANGLE[step.modifier] || 0;
+  return `<g transform="rotate(${a} 24 26)"><path d="M24 44V8M13 19L24 8l11 11" ${s}/></g>`;
+}
+
 // ---------- αναζήτηση ----------
 
 $("search").addEventListener("submit", async (e) => {
   e.preventDefault();
   const q = $("dest").value.trim();
   if (!q) return;
+  $("dest").blur();
   const params = new URLSearchParams({ q, format: "json", limit: "6", "accept-language": "el" });
   if (state.pos) {
     const d = 1.5;
@@ -183,11 +377,15 @@ $("search").addEventListener("submit", async (e) => {
       return;
     }
     for (const r of data) {
+      const [first, ...rest] = r.display_name.split(",");
       const li = document.createElement("li");
-      li.textContent = r.display_name;
+      li.textContent = first;
+      const small = document.createElement("small");
+      small.textContent = rest.join(",").trim();
+      li.appendChild(small);
       li.onclick = () => {
         $("results").innerHTML = "";
-        $("dest").value = r.display_name.split(",")[0];
+        $("dest").value = first;
         setDestination({ lat: +r.lat, lng: +r.lon, name: r.display_name });
       };
       $("results").appendChild(li);
@@ -211,6 +409,7 @@ async function fetchRoute(from, to) {
     modifier: s.maneuver.modifier,
     exit: s.maneuver.exit,
     name: s.name,
+    distance: s.distance || 0,
     loc: [s.maneuver.location[1], s.maneuver.location[0]],
   }));
   return { coords, steps, distance: r.distance, duration: r.duration };
@@ -218,7 +417,10 @@ async function fetchRoute(from, to) {
 
 function drawRoute() {
   if (routeLine) routeLine.remove();
-  routeLine = L.polyline(state.route.coords, { color: "#e8a33d", weight: 7, opacity: 0.9 }).addTo(map);
+  routeLine = L.layerGroup([
+    L.polyline(state.route.coords, { color: "#0b3d91", weight: 10, opacity: 0.9 }),
+    L.polyline(state.route.coords, { color: "#3d8bfd", weight: 6, opacity: 1 }),
+  ]).addTo(map);
 }
 
 function origin() {
@@ -230,16 +432,16 @@ function origin() {
 async function setDestination(dest) {
   state.dest = dest;
   if (destMarker) destMarker.remove();
-  destMarker = L.marker([dest.lat, dest.lng]).addTo(map);
+  destMarker = L.marker([dest.lat, dest.lng], { icon: destIcon }).addTo(map);
   try {
     state.route = await fetchRoute(origin(), dest);
   } catch {
-    showBanner("Δεν βρήκα δρόμο", "Με βάρκα θα πας;", "");
+    toast("Δεν βρήκα δρόμο. Με βάρκα θα πας;");
     speak("Δεν βρήκα δρόμο. Με βάρκα θα πας;", true);
     return;
   }
   drawRoute();
-  map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+  map.fitBounds(L.latLngBounds(state.route.coords), { padding: [60, 60] });
   startNavigation();
 }
 
@@ -253,19 +455,21 @@ function resetProgress() {
 function startNavigation() {
   resetProgress();
   state.navigating = true;
-  $("stop").hidden = false;
+  state.follow = true;
+  document.body.classList.add("navigating");
+  $("navbar").hidden = false;
   requestWakeLock();
-  const quip = pick("start");
-  const total = fmtDist(state.route.distance);
-  const mins = Math.round(state.route.duration / 60);
-  showBanner(instruction(state.route.steps[state.next]), quip, `${total} · ~${mins} λεπτά`);
-  speak(quip, true);
+  const step = state.route.steps[state.next];
+  const d = state.pos ? haversine([state.pos.lat, state.pos.lng], step.loc) : state.route.steps[0].distance;
+  showStep(step, d, quip("start", "Ξεκινάμε"));
+  updateTrip(d);
 }
 
 function stopNavigation() {
   state.navigating = false;
   stopSim();
-  $("stop").hidden = true;
+  document.body.classList.remove("navigating");
+  $("navbar").hidden = true;
   $("banner").hidden = true;
   if (routeLine) routeLine.remove();
   if (destMarker) destMarker.remove();
@@ -283,9 +487,8 @@ async function reroute() {
   const now = Date.now();
   if (now - state.lastReroute < 15000 || !state.dest || !state.pos) return;
   state.lastReroute = now;
-  const quip = pick("recalc");
-  speak(quip, true);
-  showBanner("Επανυπολογισμός…", quip, "");
+  showStep(null, null, quip("recalc", "Επανυπολογισμός διαδρομής"));
+  $("instr").textContent = "Επανυπολογισμός…";
   try {
     state.route = await fetchRoute(state.pos, state.dest);
     drawRoute();
@@ -295,11 +498,23 @@ async function reroute() {
   }
 }
 
-function showBanner(instr, quip, meta) {
+function showStep(step, dist, quipText) {
   $("banner").hidden = false;
-  $("instr").textContent = instr;
-  $("quip").textContent = quip;
-  $("meta").textContent = meta;
+  $("arrow").innerHTML = arrowSvg(step);
+  $("dist").textContent = dist != null ? fmtShort(dist) : "";
+  $("instr").textContent = step ? instruction(step) : "";
+  if (quipText !== undefined) $("quip").textContent = quipText;
+}
+
+function updateTrip(distToNext) {
+  const r = state.route;
+  let rest = distToNext;
+  for (let i = state.next; i < r.steps.length; i++) rest += r.steps[i].distance;
+  const secs = r.distance ? (rest / r.distance) * r.duration : 0;
+  const arrive = new Date(Date.now() + secs * 1000);
+  $("eta-min").textContent = Math.max(1, Math.round(secs / 60));
+  $("eta-km").textContent = fmtShort(rest);
+  $("eta-clock").textContent = arrive.toLocaleTimeString("el-GR", { hour: "2-digit", minute: "2-digit" });
 }
 
 // ---------- κάθε νέα θέση ----------
@@ -314,14 +529,14 @@ function onPosition(pos) {
   }
   if (!state.navigating || !state.route) return;
 
-  map.setView(here, Math.max(map.getZoom(), 16), { animate: true });
+  if (state.follow) map.setView(here, Math.max(map.getZoom(), 16), { animate: true });
   const now = Date.now();
   const kmh = pos.speed != null ? pos.speed * 3.6 : null;
 
   // ταχύτητα
-  if (kmh != null && kmh > SPEEDING_KMH && now - state.lastSpeedWarn > 60000) {
+  if (kmh != null && kmh > settings.speedLimit && now - state.lastSpeedWarn > 60000) {
     state.lastSpeedWarn = now;
-    speak(pick("speeding"));
+    quip("speeding", "Προσοχή, υπερβολική ταχύτητα", false);
   }
 
   // ακινησία
@@ -329,7 +544,7 @@ function onPosition(pos) {
     state.stillSince = state.stillSince || now;
     if (now - state.stillSince > IDLE_SECONDS * 1000 && now - state.lastIdleWarn > 120000) {
       state.lastIdleWarn = now;
-      speak(pick("idle"));
+      if (settings.mode !== "plain") quip("idle", "", false);
     }
   } else {
     state.stillSince = null;
@@ -348,11 +563,10 @@ function onPosition(pos) {
   const d = haversine(here, step.loc);
   state.minDist = Math.min(state.minDist, d);
   const instr = instruction(step);
+  updateTrip(d);
 
   if (step.type === "arrive" && d < 30) {
-    const quip = pick("arrive");
-    showBanner(instr, quip, "");
-    speak(quip, true);
+    showStep(step, null, quip("arrive", "Έφτασες στον προορισμό"));
     state.navigating = false;
     stopSim();
     return;
@@ -360,18 +574,17 @@ function onPosition(pos) {
 
   if (!state.announced.far && d < ANNOUNCE_FAR_M && d > ANNOUNCE_NEAR_M) {
     state.announced.far = true;
-    if (step.type === "arrive") speak(`Σε ${fmtDist(d)} φτάνεις στον προορισμό`);
-    else speak(`Σε ${fmtDist(d)}, ${instr.charAt(0).toLowerCase()}${instr.slice(1)}`);
+    if (settings.mode !== "quips") {
+      if (step.type === "arrive") speak(`Σε ${fmtDist(d)} φτάνεις στον προορισμό`);
+      else speak(`Σε ${fmtDist(d)}, ${instr.charAt(0).toLowerCase()}${instr.slice(1)}`);
+    }
   }
 
   if (!state.announced.near && d <= ANNOUNCE_NEAR_M && step.type !== "arrive") {
     state.announced.near = true;
-    const quip = pick(category(step));
-    showBanner(instr, quip, "");
-    speak(quip, true);
+    showStep(step, d, quip(category(step), instr));
   } else {
-    $("instr").textContent = instr;
-    $("meta").textContent = `σε ${fmtDist(d)}`;
+    showStep(step, d);
   }
 
   // πέρασε τη στροφή
@@ -380,10 +593,7 @@ function onPosition(pos) {
     state.announced = { far: false, near: false };
     state.minDist = Infinity;
     const nxt = state.route.steps[state.next];
-    if (nxt) {
-      $("instr").textContent = instruction(nxt);
-      $("quip").textContent = "";
-    }
+    if (nxt) showStep(nxt, haversine(here, nxt.loc), "");
   }
 }
 
@@ -419,15 +629,12 @@ function stopSim() {
 
 $("sim").onclick = () => {
   if (state.simTimer) return stopSim();
-  if (!state.route) {
-    speak("Πού να πάμε, ρε; Βάλε πρώτα προορισμό.", true);
-    showBanner("Βάλε προορισμό", "Πού να πάμε, ρε;", "");
-    return;
-  }
+  if (!state.route) return toast("Βάλε πρώτα προορισμό.");
   if (!state.navigating) startNavigation();
   const coords = state.route.coords;
   const SPEED = 14; // m/s ≈ 50 χλμ/ώρα
   let i = 0, along = 0;
+  state.follow = true;
   $("sim").textContent = "Παύση";
   state.simTimer = setInterval(() => {
     let move = SPEED;
@@ -453,5 +660,163 @@ $("sim").onclick = () => {
     });
   }, 1000);
 };
+
+// ---------- σίγαση ----------
+
+const SPEAKER_ON = '<svg class="ico" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>';
+const SPEAKER_OFF = '<svg class="ico" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4zM22 9l-6 6M16 9l6 6"/></svg>';
+let modeBeforeMute = settings.mode === "mute" ? "both" : settings.mode;
+
+function renderMute() {
+  const muted = settings.mode === "mute";
+  $("mute").innerHTML = muted ? SPEAKER_OFF : SPEAKER_ON;
+  $("mute").classList.toggle("off", muted);
+}
+$("mute").onclick = () => {
+  if (settings.mode === "mute") settings.mode = modeBeforeMute;
+  else {
+    modeBeforeMute = settings.mode;
+    settings.mode = "mute";
+    stopSound();
+  }
+  $("s-mode").value = settings.mode;
+  saveSettings();
+  renderMute();
+  toast(settings.mode === "mute" ? "Σίγαση" : "Ήχος ανοιχτός");
+};
+
+// ---------- οθόνη ρυθμίσεων ----------
+
+$("open-settings").onclick = () => {
+  $("settings").hidden = false;
+  renderClips();
+};
+$("close-settings").onclick = () => ($("settings").hidden = true);
+$("settings").onclick = (e) => {
+  if (e.target === $("settings")) $("settings").hidden = true;
+};
+
+function bindSetting(id, key, { output, format = (v) => v, parse = (v) => v } = {}) {
+  const el = $(id);
+  const isBox = el.type === "checkbox";
+  if (isBox) el.checked = settings[key];
+  else el.value = settings[key];
+  const show = () => output && ($(output).textContent = format(settings[key]));
+  show();
+  el.addEventListener(isBox || el.tagName === "SELECT" ? "change" : "input", () => {
+    settings[key] = isBox ? el.checked : parse(el.value);
+    show();
+    saveSettings();
+    if (key === "mode") {
+      renderMute();
+      if (settings.mode !== "mute") modeBeforeMute = settings.mode;
+    }
+  });
+}
+
+bindSetting("s-voice", "voiceURI");
+bindSetting("s-rate", "rate", { output: "o-rate", parse: Number, format: (v) => v.toFixed(1) + "×" });
+bindSetting("s-pitch", "pitch", { output: "o-pitch", parse: Number, format: (v) => v.toFixed(1) });
+bindSetting("s-volume", "volume", { output: "o-volume", parse: Number, format: (v) => Math.round(v * 100) + "%" });
+bindSetting("s-mode", "mode");
+bindSetting("s-lang", "lang");
+bindSetting("s-chime", "chime");
+bindSetting("s-speed", "speedLimit", { output: "o-speed", parse: Number, format: (v) => v + " χλμ/ώρα" });
+bindSetting("s-myaudio", "myAudio");
+renderMute();
+
+$("test-voice").onclick = () => {
+  const wasMuted = settings.mode === "mute";
+  if (wasMuted) settings.mode = "both";
+  quip("right", "Στρίψε δεξιά");
+  if (wasMuted) settings.mode = "mute";
+};
+
+// ---------- ηχογραφήσεις ----------
+
+for (const [key, label] of Object.entries(CATEGORIES)) {
+  const o = document.createElement("option");
+  o.value = key;
+  o.textContent = label;
+  $("rec-cat").appendChild(o);
+}
+$("rec-cat").onchange = renderClips;
+
+function renderClips() {
+  const cat = $("rec-cat").value;
+  const list = $("rec-list");
+  const clips = Recordings.forCategory(cat);
+  list.innerHTML = "";
+  if (!clips.length) {
+    list.innerHTML = '<li class="empty">Καμία ηχογράφηση ακόμα</li>';
+    return;
+  }
+  for (const c of clips) {
+    const li = document.createElement("li");
+    const play = document.createElement("button");
+    play.className = "icon-btn";
+    play.textContent = "▶";
+    play.onclick = () => playClip(c);
+    const name = document.createElement("span");
+    name.textContent = c.name;
+    const del = document.createElement("button");
+    del.className = "icon-btn";
+    del.textContent = "✕";
+    del.setAttribute("aria-label", "Διαγραφή");
+    del.onclick = async () => {
+      if (!confirm("Να σβηστεί αυτή η ηχογράφηση;")) return;
+      await Recordings.remove(c.id);
+      renderClips();
+    };
+    li.append(play, name, del);
+    list.appendChild(li);
+  }
+}
+
+function clipName(cat) {
+  const n = Recordings.forCategory(cat).length + 1;
+  return `${CATEGORIES[cat]} #${n}`;
+}
+
+let recorder = null;
+$("rec-btn").onclick = async () => {
+  if (recorder && recorder.state === "recording") return recorder.stop();
+  if (!navigator.mediaDevices || !window.MediaRecorder) return toast("Το κινητό δεν υποστηρίζει ηχογράφηση εδώ.");
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    return toast("Χρειάζομαι άδεια για το μικρόφωνο.");
+  }
+  const type = ["audio/mp4", "audio/webm", "audio/ogg"].find((t) => MediaRecorder.isTypeSupported(t));
+  recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+  const chunks = [];
+  const cat = $("rec-cat").value;
+  recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  recorder.onstop = async () => {
+    stream.getTracks().forEach((t) => t.stop());
+    $("rec-btn").classList.remove("on");
+    $("rec-btn").textContent = "● Ηχογράφηση";
+    if (!chunks.length) return;
+    await Recordings.add(cat, new Blob(chunks, { type: recorder.mimeType || type }), clipName(cat));
+    renderClips();
+    toast("Αποθηκεύτηκε!");
+  };
+  recorder.start();
+  $("rec-btn").classList.add("on");
+  $("rec-btn").textContent = "■ Σταμάτα";
+};
+
+$("rec-file").onchange = async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  const cat = $("rec-cat").value;
+  await Recordings.add(cat, file, file.name.replace(/\.[^.]+$/, "") || clipName(cat));
+  renderClips();
+  toast("Προστέθηκε!");
+};
+
+Recordings.load();
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});

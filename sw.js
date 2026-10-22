@@ -1,6 +1,6 @@
 // Απλό service worker: κρατάει τα αρχεία της εφαρμογής, ό,τι άλλο πάει στο δίκτυο.
-const CACHE = "gps-mangas-v1";
-const FILES = ["./", "index.html", "style.css", "app.js", "phrases.js", "manifest.json", "icon.svg"];
+const CACHE = "gps-mangas-v2";
+const FILES = ["./", "index.html", "style.css", "app.js", "phrases.js", "recordings.js", "manifest.json", "icon.svg"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)));

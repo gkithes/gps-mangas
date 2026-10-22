@@ -3,7 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1b2430">
+  <meta name="theme-color" content="#11161d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GPS Μάγκας">
   <title>GPS Μάγκας</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -14,32 +17,129 @@
 <body>
   <div id="map"></div>
 
+  <!-- αναζήτηση -->
   <div id="top">
-    <form id="search">
-      <input id="dest" type="search" placeholder="Πού πάμε, ρε;" autocomplete="off">
-      <button type="submit">Πάμε</button>
+    <form id="search" class="card">
+      <svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      <input id="dest" type="search" placeholder="Πού πάμε, ρε;" autocomplete="off" enterkeyhint="search">
+      <button type="submit" class="go">Πάμε</button>
+      <button type="button" id="open-settings" class="icon-btn" aria-label="Ρυθμίσεις">
+        <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
     </form>
-    <ul id="results"></ul>
+    <ul id="results" class="card"></ul>
   </div>
 
-  <div id="banner" hidden>
-    <div id="instr"></div>
+  <!-- κάρτα οδηγίας -->
+  <div id="banner" class="card" hidden>
+    <div class="maneuver"><svg id="arrow" viewBox="0 0 48 48"></svg></div>
+    <div class="banner-text">
+      <div id="dist"></div>
+      <div id="instr"></div>
+    </div>
     <div id="quip"></div>
-    <div id="meta"></div>
   </div>
 
-  <div id="controls">
-    <select id="lang" title="Γλώσσα ατάκων">
-      <option value="el">Ελληνικά</option>
-      <option value="pnt">Ποντιακά</option>
-      <option value="mix">Ανάμικτα</option>
-    </select>
-    <button id="sim" title="Δοκιμή χωρίς οδήγηση">Προσομοίωση</button>
-    <button id="stop" hidden>Σταμάτα</button>
+  <!-- κάτω μπάρα πλοήγησης -->
+  <div id="bottom">
+    <button id="recenter" class="fab" aria-label="Κέντρο" hidden>
+      <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+    </button>
+    <div id="navbar" class="card" hidden>
+      <div class="trip">
+        <div><b id="eta-min">–</b><span>λεπτά</span></div>
+        <div><b id="eta-km">–</b><span>απόσταση</span></div>
+        <div><b id="eta-clock">–</b><span>άφιξη</span></div>
+      </div>
+      <div class="nav-actions">
+        <button id="mute" class="icon-btn" aria-label="Σίγαση"></button>
+        <button id="sim" class="pill">Προσομοίωση</button>
+        <button id="stop" class="pill danger">Τέλος</button>
+      </div>
+    </div>
   </div>
+
+  <!-- ρυθμίσεις -->
+  <div id="settings" class="sheet-wrap" hidden>
+    <div class="sheet">
+      <header>
+        <h2>Ρυθμίσεις</h2>
+        <button id="close-settings" class="pill">Κλείσιμο</button>
+      </header>
+
+      <section>
+        <h3>Φωνή</h3>
+        <label>Φωνή ανάγνωσης
+          <select id="s-voice"></select>
+        </label>
+        <p class="hint" id="voice-hint">Για καλύτερη ελληνική φωνή στο iPhone: Ρυθμίσεις → Προσβασιμότητα → Εκφώνηση περιεχομένου → Φωνές → Ελληνικά, και κατέβασε μια «Βελτιωμένη».</p>
+        <label>Ταχύτητα <output id="o-rate"></output>
+          <input id="s-rate" type="range" min="0.6" max="1.6" step="0.1">
+        </label>
+        <label>Τόνος <output id="o-pitch"></output>
+          <input id="s-pitch" type="range" min="0.5" max="1.8" step="0.1">
+        </label>
+        <label>Ένταση <output id="o-volume"></output>
+          <input id="s-volume" type="range" min="0" max="1" step="0.1">
+        </label>
+        <button id="test-voice" class="pill wide">▶ Δοκιμή φωνής</button>
+      </section>
+
+      <section>
+        <h3>Ήχος</h3>
+        <label>Τι ακούγεται
+          <select id="s-mode">
+            <option value="both">Οδηγίες + ατάκες</option>
+            <option value="quips">Μόνο ατάκες</option>
+            <option value="plain">Μόνο οδηγίες (σοβαρό)</option>
+            <option value="mute">Σίγαση</option>
+          </select>
+        </label>
+        <label>Γλώσσα ατάκων
+          <select id="s-lang">
+            <option value="el">Ελληνικά</option>
+            <option value="pnt">Ποντιακά</option>
+            <option value="mix">Ανάμικτα</option>
+          </select>
+        </label>
+        <label class="row">Ήχος «ντινγκ» πριν από κάθε οδηγία
+          <input id="s-chime" type="checkbox">
+        </label>
+        <label>Προειδοποίηση ταχύτητας πάνω από <output id="o-speed"></output>
+          <input id="s-speed" type="range" min="50" max="160" step="10">
+        </label>
+        <p class="hint">Ο ήχος βγαίνει εκεί που τον στέλνει το κινητό: ηχείο, ακουστικά ή αυτοκίνητο μέσω Bluetooth.</p>
+      </section>
+
+      <section>
+        <h3>Οι δικές μου ηχογραφήσεις</h3>
+        <p class="hint">Ηχογράφησε τη φωνή σου (ή ανέβασε αρχείο ήχου) για κάθε περίπτωση. Μένουν αποθηκευμένα σε αυτό το κινητό.</p>
+        <label>Περίπτωση
+          <select id="rec-cat"></select>
+        </label>
+        <div class="rec-buttons">
+          <button id="rec-btn" class="pill rec">● Ηχογράφηση</button>
+          <label class="pill file">Ανέβασμα αρχείου
+            <input id="rec-file" type="file" accept="audio/*" hidden>
+          </label>
+        </div>
+        <ul id="rec-list"></ul>
+        <label>Πώς παίζονται
+          <select id="s-myaudio">
+            <option value="mix">Ανάμικτα με τις γραπτές ατάκες</option>
+            <option value="only">Μόνο οι δικές μου (όπου υπάρχουν)</option>
+            <option value="off">Ποτέ</option>
+          </select>
+        </label>
+      </section>
+    </div>
+  </div>
+
+  <div id="toast" hidden></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="phrases.js"></script>
+  <script src="recordings.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
