@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1b2430">
+  <title>GPS Μάγκας</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="map"></div>
+
+  <div id="top">
+    <form id="search">
+      <input id="dest" type="search" placeholder="Πού πάμε, ρε;" autocomplete="off">
+      <button type="submit">Πάμε</button>
+    </form>
+    <ul id="results"></ul>
+  </div>
+
+  <div id="banner" hidden>
+    <div id="instr"></div>
+    <div id="quip"></div>
+    <div id="meta"></div>
+  </div>
+
+  <div id="controls">
+    <select id="lang" title="Γλώσσα ατάκων">
+      <option value="el">Ελληνικά</option>
+      <option value="pnt">Ποντιακά</option>
+      <option value="mix">Ανάμικτα</option>
+    </select>
+    <button id="sim" title="Δοκιμή χωρίς οδήγηση">Προσομοίωση</button>
+    <button id="stop" hidden>Σταμάτα</button>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="phrases.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
