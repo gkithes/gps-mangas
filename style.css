@@ -135,6 +135,13 @@ body.navigating #top { display: none; }
 #instr { font-size: 17px; font-weight: 600; opacity: .95; }
 #quip { grid-column: 1 / -1; color: #ffd28a; font-size: 16px; font-style: italic; border-top: 1px solid rgba(255,255,255,.15); padding-top: 8px; margin-top: 6px; }
 #quip:empty { display: none; }
+#status { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff;
+  background: rgba(0,0,0,.25); border-radius: 10px; padding: 6px 10px; margin-top: 6px; }
+#status[hidden] { display: none; }
+#status::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #fbbf24; animation: pulse 1s infinite; flex: none; }
+.list li.loading { color: var(--muted); font-size: 13px; justify-content: flex-start; cursor: default; padding: 8px 14px; }
+.list li.loading::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--muted); border-top-color: transparent; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* μπάρα πλοήγησης */
 #navbar { padding: 12px; }

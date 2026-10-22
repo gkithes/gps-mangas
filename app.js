@@ -1,15 +1,19 @@
 // GPS Μάγκας — πλοήγηση με ατάκες.
-// Χάρτης: OpenStreetMap, διαδρομές: OSRM, αναζήτηση: Nominatim, κοντινά μέρη: Overpass,
+// Χάρτης: OpenStreetMap, διαδρομές: OSRM, αναζήτηση: Photon/Nominatim, κοντινά μέρη: Overpass (τοπική μνήμη),
 // φωνή: Web Speech (el-GR).
 
-const OSRM = "https://router.project-osrm.org/route/v1/driving/";
+const OSRM = [
+  "https://router.project-osrm.org/route/v1/driving/",
+  "https://routing.openstreetmap.de/routed-car/route/v1/driving/",
+];
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
-const OVERPASS = "https://overpass-api.de/api/interpreter";
+const PHOTON = "https://photon.komoot.io/api/";
 
-const ANNOUNCE_FAR_M = 250;   // "Σε 200 μέτρα..."
-const ANNOUNCE_NEAR_M = 45;   // εδώ πέφτει η ατάκα
-const OFF_ROUTE_M = 60;
+const OFF_ROUTE_M = 60;       // πόσο μακριά από τη γραμμή = εκτός διαδρομής
+const PASSED_M = 8;           // πόσο μετά τη στροφή θεωρείται «περασμένη»
 const IDLE_SECONDS = 90;
+const GPS_LOST_MS = 10000;    // χωρίς θέση τόσο χρόνο = χάθηκε το σήμα
+const REROUTE_RETRY_MS = 5000;
 
 const CATEGORIES = {
   start: "Ξεκίνημα",
@@ -25,27 +29,30 @@ const CATEGORIES = {
   arrive: "Άφιξη",
 };
 
-// Κουμπιά «κοντά μου» στην κάτω μπάρα: [όνομα, εικονίδιο, φίλτρα OpenStreetMap]
-const NEARBY = {
-  fuel: ["Βενζίνη", "⛽", ['["amenity"="fuel"]']],
-  food: ["Φαγητό", "🍽", ['["amenity"~"^(restaurant|fast_food)$"]']],
-  cafe: ["Καφές", "☕", ['["amenity"="cafe"]']],
-  market: ["Σούπερ μάρκετ", "🛒", ['["shop"~"^(supermarket|convenience)$"]']],
-  pharmacy: ["Φαρμακείο", "💊", ['["amenity"="pharmacy"]']],
-  parking: ["Πάρκινγκ", "🅿️", ['["amenity"="parking"]']],
-  atm: ["ATM", "🏧", ['["amenity"~"^(atm|bank)$"]']],
-  ev: ["Φόρτιση EV", "🔌", ['["amenity"="charging_station"]']],
-  hotel: ["Ξενοδοχείο", "🏨", ['["tourism"~"^(hotel|motel|guest_house)$"]']],
-  hospital: ["Νοσοκομείο", "🏥", ['["amenity"~"^(hospital|clinic)$"]']],
-  carwash: ["Πλυντήριο", "🧽", ['["amenity"="car_wash"]']],
-  repair: ["Συνεργείο", "🔧", ['["shop"~"^(car_repair|tyres)$"]']],
-  wc: ["Τουαλέτα", "🚻", ['["amenity"="toilets"]']],
-};
-
 const $ = (id) => document.getElementById(id);
 
 // Το iPhone να μη μεγεθύνει τη σελίδα με τσίμπημα (ο χάρτης ζουμάρει κανονικά).
 document.addEventListener("gesturestart", (e) => e.preventDefault());
+
+// ---------- ασφάλεια: ένα λάθος δεν σταματάει ποτέ την πλοήγηση ----------
+
+let lastErrorToast = 0;
+function reportError(e) {
+  console.error(e);
+  if (Date.now() - lastErrorToast > 30000 && typeof toast === "function") {
+    lastErrorToast = Date.now();
+    toast("Κάτι στράβωσε, αλλά συνεχίζω.");
+  }
+}
+function safe(fn) {
+  try {
+    return fn();
+  } catch (e) {
+    reportError(e);
+  }
+}
+window.addEventListener("error", (e) => reportError(e.error || e.message));
+window.addEventListener("unhandledrejection", (e) => reportError(e.reason));
 
 // ---------- ρυθμίσεις ----------
 
@@ -74,6 +81,12 @@ function saveSettings() {
     localStorage.setItem("gps-mangas-settings", JSON.stringify(settings));
   } catch {}
 }
+
+// Τελευταία γνωστή θέση, για να ανοίγει η εφαρμογή αμέσως εκεί που είσαι.
+let lastKnown = null;
+try {
+  lastKnown = JSON.parse(localStorage.getItem("gps-mangas-last-pos") || "null");
+} catch {}
 
 // ---------- μονάδες ----------
 
@@ -116,7 +129,8 @@ function fmtClock(secsFromNow) {
 
 // ---------- χάρτης ----------
 
-const map = L.map("map", { zoomControl: false, attributionControl: false }).setView([37.9838, 23.7275], 13);
+const startView = lastKnown ? [lastKnown.lat, lastKnown.lng] : [37.9838, 23.7275];
+const map = L.map("map", { zoomControl: false, attributionControl: false }).setView(startView, lastKnown ? 15 : 13);
 L.control.attribution({ position: "topright", prefix: false }).addTo(map);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
@@ -139,22 +153,27 @@ const poiLayer = L.layerGroup().addTo(map);
 const state = {
   mode: "home",       // home | places | preview | nav
   pos: null,          // { lat, lng, speed (m/s) | null, accuracy }
+  lastFix: 0,         // πότε ήρθε η τελευταία θέση από το GPS
+  lastGpsRestart: 0,
+  gpsLost: false,
   dest: null,         // { lat, lng, name, sub }
   routes: [],         // εναλλακτικές διαδρομές στην προεπισκόπηση
   selected: 0,
-  route: null,        // η διαδρομή της πλοήγησης: { coords, steps, distance, duration, ... }
+  route: null,        // η διαδρομή της πλοήγησης
   next: 0,            // index of the next maneuver in route.steps
-  announced: { far: false, near: false },
-  minDist: Infinity,
+  announced: {},      // τι έχει ειπωθεί για την τρέχουσα στροφή
   offCount: 0,
+  offRoute: false,
+  rerouting: false,
+  recalcSpoken: false,
   lastReroute: 0,
   lastSpeedWarn: 0,
   stillSince: null,
   lastIdleWarn: 0,
   navigating: false,
+  arrived: false,
   follow: true,
   simTimer: null,
-  wakeLock: null,
   lastPicked: {},
 };
 
@@ -175,6 +194,11 @@ function toast(text) {
   $("toast").hidden = false;
   clearTimeout(toast.t);
   toast.t = setTimeout(() => ($("toast").hidden = true), 2500);
+}
+
+function setStatus(text) {
+  $("status").textContent = text || "";
+  $("status").hidden = !text;
 }
 
 // Ποια κάρτα φαίνεται κάτω: αρχική, κοντινά, επιλογή διαδρομής ή πλοήγηση.
@@ -215,13 +239,18 @@ function unlockAudio() {
   } catch {}
   player.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
   player.play().catch(() => {});
-  if ("speechSynthesis" in window) speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+  if ("speechSynthesis" in window) {
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;
+    speechSynthesis.speak(u);
+  }
   document.removeEventListener("pointerdown", unlockAudio);
 }
 document.addEventListener("pointerdown", unlockAudio);
 
 function chime() {
   if (!settings.chime || !audioCtx) return;
+  if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
   const t = audioCtx.currentTime;
   [880, 1320].forEach((f, i) => {
     const o = audioCtx.createOscillator();
@@ -274,7 +303,17 @@ function currentVoice() {
   );
 }
 
+// Δική μας ουρά ομιλίας: δίνουμε στη φωνή του κινητού μία φράση τη φορά και
+// την παρακολουθούμε. Αν «κολλήσει» (συμβαίνει στο iPhone), την ξεκολλάμε αμέσως
+// και ξαναλέμε τη φράση, ώστε να μη χαθεί καμία οδηγία.
+const speech = { queue: [], job: null, eventsWork: false };
+
 function stopSound() {
+  speech.queue.length = 0;
+  if (speech.job) {
+    clearTimeout(speech.job.timer);
+    speech.job = null;
+  }
   if ("speechSynthesis" in window) speechSynthesis.cancel();
   player.pause();
 }
@@ -282,14 +321,63 @@ function stopSound() {
 function speak(text, interrupt = false) {
   if (settings.mode === "mute" || !text || !("speechSynthesis" in window)) return;
   if (interrupt) stopSound();
+  speech.queue.push({ text, tries: 0 });
+  // στο iPhone, μια φράση αμέσως μετά το cancel() χάνεται — μικρή αναμονή
+  setTimeout(pumpSpeech, interrupt ? 120 : 0);
+}
+
+function pumpSpeech() {
+  if (speech.job || !speech.queue.length) return;
+  // μην μιλάμε πάνω από δική σου ηχογράφηση
+  if (!player.paused && !player.ended && player.dataset.url) return void setTimeout(pumpSpeech, 300);
+  const item = speech.queue.shift();
+  const job = { item, started: false, timer: null };
+  speech.job = job;
+
+  const finish = () => {
+    if (speech.job !== job) return;
+    clearTimeout(job.timer);
+    speech.job = null;
+    pumpSpeech();
+  };
+  const stuck = () => {
+    if (speech.job !== job) return;
+    // Μιλάει ήδη (απλώς δεν ειδοποίησε); άφησέ τη να τελειώσει, με όριο χρόνου.
+    if (!job.started && speechSynthesis.speaking && !job.waited) {
+      job.waited = true;
+      job.timer = setTimeout(stuck, Math.max(8000, (item.text.length * 140) / settings.rate));
+      return;
+    }
+    speechSynthesis.cancel();
+    speech.job = null;
+    // ξαναλέμε τη φράση μόνο αν η φωνή του κινητού ειδοποιεί κανονικά (αλλιώς θα την ακούγαμε διπλή)
+    if (!job.started && !job.waited && speech.eventsWork && item.tries < 2) {
+      item.tries++;
+      speech.queue.unshift(item); // ξαναπροσπάθησε την ίδια φράση
+    }
+    setTimeout(pumpSpeech, 150);
+  };
+
+  try {
+    speechSynthesis.resume(); // ξεκολλάει τη φωνή μετά από κλήση, Siri κ.λπ.
+  } catch {}
   chime();
-  const u = new SpeechSynthesisUtterance(text);
+  const u = new SpeechSynthesisUtterance(item.text);
   const v = currentVoice();
   u.lang = v ? v.lang : "el-GR";
   if (v) u.voice = v;
   u.rate = settings.rate;
   u.pitch = settings.pitch;
   u.volume = settings.volume;
+  u.onstart = () => {
+    job.started = true;
+    speech.eventsWork = true;
+    clearTimeout(job.timer);
+    job.timer = setTimeout(stuck, Math.max(8000, (item.text.length * 140) / settings.rate));
+  };
+  u.onend = finish;
+  u.onerror = finish;
+  job.timer = setTimeout(stuck, 4000); // δεν ξεκίνησε σε 4″ = κόλλησε
   speechSynthesis.speak(u);
 }
 
@@ -357,22 +445,60 @@ function haversine(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-// Απόσταση σημείου από τη διαδρομή (σε μέτρα), με τοπική επίπεδη προβολή.
-function distanceToRoute(p, coords) {
+// Ετοιμάζει τη διαδρομή για γρήγορο εντοπισμό: απόσταση από την αρχή σε κάθε σημείο
+// και σε κάθε στροφή («πόσα μέτρα της διαδρομής έχουν γίνει»).
+function prepareRoute(r) {
+  const c = r.coords;
+  const cum = [0];
+  for (let i = 1; i < c.length; i++) cum.push(cum[i - 1] + haversine(c[i - 1], c[i]));
+  let j = 0;
+  for (const s of r.steps) {
+    let best = Infinity, bi = j;
+    for (let k = j; k < c.length; k++) {
+      const d = haversine(c[k], s.loc);
+      if (d < best) {
+        best = d;
+        bi = k;
+        if (d < 1) break;
+      }
+    }
+    s.along = cum[bi];
+    j = bi;
+  }
+  r.cum = cum;
+  r.length = cum[cum.length - 1];
+  r.seg = 0;
+  return r;
+}
+
+// Πού βρίσκεσαι πάνω στη διαδρομή: πόσα μέτρα έχεις κάνει (along) και πόσο μακριά είσαι από τη γραμμή (off).
+function locate(r, p) {
+  const c = r.coords;
   const kx = 111320 * Math.cos((p[0] * Math.PI) / 180);
   const ky = 110540;
-  let best = Infinity;
-  for (let i = 0; i < coords.length - 1; i++) {
-    const ax = (coords[i][1] - p[1]) * kx, ay = (coords[i][0] - p[0]) * ky;
-    const bx = (coords[i + 1][1] - p[1]) * kx, by = (coords[i + 1][0] - p[0]) * ky;
-    const dx = bx - ax, dy = by - ay;
-    const len2 = dx * dx + dy * dy;
-    let t = len2 ? -(ax * dx + ay * dy) / len2 : 0;
-    t = Math.max(0, Math.min(1, t));
-    const d = Math.hypot(ax + t * dx, ay + t * dy);
-    if (d < best) best = d;
+  const scan = (from, to) => {
+    let best = { off: Infinity, seg: from, along: 0 };
+    for (let i = from; i < to; i++) {
+      const ax = (c[i][1] - p[1]) * kx, ay = (c[i][0] - p[0]) * ky;
+      const bx = (c[i + 1][1] - p[1]) * kx, by = (c[i + 1][0] - p[0]) * ky;
+      const dx = bx - ax, dy = by - ay;
+      const len2 = dx * dx + dy * dy;
+      let t = len2 ? -(ax * dx + ay * dy) / len2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      const off = Math.hypot(ax + t * dx, ay + t * dy);
+      if (off < best.off) best = { off, seg: i, along: r.cum[i] + t * (r.cum[i + 1] - r.cum[i]) };
+    }
+    return best;
+  };
+  const last = c.length - 1;
+  // πρώτα κοντά στο σημείο που ήσουν (γρήγορο), αλλιώς σε όλη τη διαδρομή
+  let res = scan(Math.max(0, r.seg - 20), Math.min(last, r.seg + 400));
+  if (res.off > 40) {
+    const all = scan(0, last);
+    if (all.off < res.off - 5) res = all;
   }
-  return best;
+  r.seg = res.seg;
+  return res;
 }
 
 // ---------- οδηγίες ----------
@@ -425,6 +551,8 @@ function instruction(step) {
   }
 }
 
+const lowerFirst = (s) => s.charAt(0).toLowerCase() + s.slice(1);
+
 // Εικονίδιο βέλους για την κάρτα.
 function arrowSvg(step) {
   const s = 'fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"';
@@ -441,42 +569,11 @@ function arrowSvg(step) {
 
 // ---------- αναζήτηση ----------
 
-$("search").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const q = $("dest").value.trim();
-  // Η μπάρα αδειάζει εντελώς μόλις πατηθεί «Πάμε».
-  $("dest").value = "";
-  $("dest").blur();
-  if (!q) return;
-  const params = new URLSearchParams({ q, format: "json", limit: "8", "accept-language": "el" });
-  const from = origin();
-  const d = 1.5;
-  params.set("viewbox", [from.lng - d, from.lat + d, from.lng + d, from.lat - d].join(","));
-  const list = $("results");
-  list.innerHTML = `<li class="head">Ψάχνω «${escapeHtml(q)}»…</li>`;
-  try {
-    const res = await fetch(`${NOMINATIM}?${params}`);
-    const data = await res.json();
-    if (!data.length) {
-      list.innerHTML = `<li class="empty">Δεν βρήκα «${escapeHtml(q)}». Γράψ' το σωστά, ρε!</li>`;
-      return;
-    }
-    list.innerHTML = `<li class="head">Αποτελέσματα για «${escapeHtml(q)}»</li>`;
-    for (const r of data) {
-      const [first, ...rest] = r.display_name.split(",");
-      const place = { lat: +r.lat, lng: +r.lon, name: first.trim(), sub: rest.join(",").trim() };
-      const dist = haversine([from.lat, from.lng], [place.lat, place.lng]);
-      const li = placeRow("📍", place.name, place.sub, fmtShort(dist));
-      li.onclick = () => {
-        list.innerHTML = "";
-        previewDestination(place);
-      };
-      list.appendChild(li);
-    }
-  } catch {
-    list.innerHTML = '<li class="empty">Δεν έχει ίντερνετ; Ούτε κι εγώ.</li>';
-  }
-});
+function origin() {
+  if (state.pos) return state.pos;
+  const c = map.getCenter();
+  return { lat: c.lat, lng: c.lng, speed: null, accuracy: 0 };
+}
 
 function placeRow(icon, name, sub, right) {
   const li = document.createElement("li");
@@ -486,87 +583,217 @@ function placeRow(icon, name, sub, right) {
   return li;
 }
 
+function photonToPlace(f) {
+  const p = f.properties || {};
+  const [lng, lat] = f.geometry.coordinates;
+  const name = p.name || [p.street, p.housenumber].filter(Boolean).join(" ") || p.city || "Σημείο";
+  const sub = [p.name && p.street ? [p.street, p.housenumber].filter(Boolean).join(" ") : "", p.city || p.county, p.state, p.country]
+    .filter((x) => x && x !== name)
+    .join(", ");
+  return { lat, lng, name, sub };
+}
+
+async function searchPhoton(q, from, signal, limit = 8) {
+  const params = new URLSearchParams({ q, limit: String(limit), lat: from.lat.toFixed(4), lon: from.lng.toFixed(4) });
+  const data = await Net.json(`${PHOTON}?${params}`, { signal }, 6000);
+  return (data.features || []).map(photonToPlace);
+}
+
+async function searchNominatim(q, from, signal) {
+  const d = 1.5;
+  const params = new URLSearchParams({
+    q, format: "json", limit: "8", "accept-language": "el",
+    viewbox: [from.lng - d, from.lat + d, from.lng + d, from.lat - d].join(","),
+  });
+  const data = await Net.json(`${NOMINATIM}?${params}`, { signal }, 8000);
+  return data.map((r) => {
+    const [first, ...rest] = r.display_name.split(",");
+    return { lat: +r.lat, lng: +r.lon, name: first.trim(), sub: rest.join(",").trim() };
+  });
+}
+
+// Άμεσες προτάσεις από ό,τι υπάρχει ήδη στο κινητό: αγαπημένα, πρόσφατα, κοντινά μέρη.
+function localSuggestions(q, from) {
+  const norm = POI.normalize(q);
+  const out = [];
+  const seen = new Set();
+  const add = (icon, p) => {
+    const k = `${(+p.lat).toFixed(4)},${(+p.lng).toFixed(4)}`;
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push({ icon, place: p });
+  };
+  for (const p of Places.favorites()) if (POI.normalize(p.name + " " + p.sub).includes(norm)) add("★", p);
+  for (const p of Places.history()) if (POI.normalize(p.name + " " + p.sub).includes(norm)) add("🕘", p);
+  for (const p of POI.find(norm, from, 5)) add(POI.CATS[p.cat][1], p);
+  return out.slice(0, 8);
+}
+
+let suggestAbort = null;
+let suggestTimer = null;
+let lastSuggest = { q: "", remote: [] };
+
+function renderResults(q, local, remote, { loading = false, header = "" } = {}) {
+  const list = $("results");
+  const from = origin();
+  list.innerHTML = "";
+  if (header) {
+    const h = document.createElement("li");
+    h.className = "head";
+    h.textContent = header;
+    list.appendChild(h);
+  }
+  const seen = new Set();
+  const addRow = (icon, place) => {
+    const k = `${(+place.lat).toFixed(3)},${(+place.lng).toFixed(3)}|${POI.normalize(place.name)}`;
+    if (seen.has(k)) return;
+    seen.add(k);
+    const li = placeRow(icon, place.name, place.sub, fmtShort(haversine([from.lat, from.lng], [place.lat, place.lng])));
+    li.onclick = () => {
+      $("dest").value = "";
+      list.innerHTML = "";
+      previewDestination(place);
+    };
+    list.appendChild(li);
+  };
+  for (const s of local) addRow(s.icon, s.place);
+  for (const p of remote) addRow("📍", p);
+  if (loading) {
+    const li = document.createElement("li");
+    li.className = "loading";
+    li.textContent = "Ψάχνω…";
+    list.appendChild(li);
+  } else if (!list.querySelector("li:not(.head)")) {
+    list.innerHTML = `<li class="empty">Δεν βρήκα «${escapeHtml(q)}». Γράψ' το σωστά, ρε!</li>`;
+  }
+}
+
+// Προτάσεις όσο γράφεις: τα τοπικά αμέσως, τα υπόλοιπα από το ίντερνετ σε λίγο.
+$("dest").addEventListener("input", () => {
+  const q = $("dest").value.trim();
+  clearTimeout(suggestTimer);
+  if (suggestAbort) suggestAbort.abort();
+  if (q.length < 2) {
+    $("results").innerHTML = "";
+    return;
+  }
+  const from = origin();
+  const local = localSuggestions(q, from);
+  renderResults(q, local, [], { loading: true });
+  suggestTimer = setTimeout(async () => {
+    const ctrl = (suggestAbort = new AbortController());
+    try {
+      const remote = await searchPhoton(q, from, ctrl.signal, 6);
+      if (ctrl.signal.aborted || $("dest").value.trim() !== q) return;
+      lastSuggest = { q, remote };
+      renderResults(q, local, remote);
+    } catch {
+      if (!ctrl.signal.aborted && $("dest").value.trim() === q) renderResults(q, local, []);
+    }
+  }, 250);
+});
+
+$("search").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const q = $("dest").value.trim();
+  // Η μπάρα αδειάζει εντελώς μόλις πατηθεί «Πάμε».
+  $("dest").value = "";
+  $("dest").blur();
+  clearTimeout(suggestTimer);
+  if (suggestAbort) suggestAbort.abort();
+  if (!q) return;
+  const from = origin();
+  const header = `Αποτελέσματα για «${q}»`;
+  const local = localSuggestions(q, from);
+  // ό,τι βρήκαν ήδη οι προτάσεις φαίνεται αμέσως
+  const have = lastSuggest.q === q ? lastSuggest.remote : [];
+  renderResults(q, local, have, { loading: true, header });
+  const ctrl = (suggestAbort = new AbortController());
+  let remote = [];
+  try {
+    remote = await searchNominatim(q, from, ctrl.signal);
+  } catch {}
+  if (!remote.length && !ctrl.signal.aborted) {
+    try {
+      remote = await searchPhoton(q, from, ctrl.signal);
+    } catch {}
+  }
+  if (ctrl.signal.aborted) return;
+  renderResults(q, local, [...have, ...remote], { header });
+});
+
 // ---------- κοντινά μέρη (κάτω μπάρα) ----------
 
-for (const [key, [label, icon]] of Object.entries(NEARBY)) {
+for (const [key, [label, icon]] of Object.entries(POI.CATS)) {
   const b = document.createElement("button");
   b.className = "chip";
   b.dataset.key = key;
   b.innerHTML = `<span>${icon}</span>${label}`;
-  b.onclick = () => searchNearby(key, b);
+  b.onclick = () => showNearby(key, b);
   $("ribbon").appendChild(b);
 }
 
-async function overpass(filters, from, radius) {
-  const parts = filters.map((f) => `nwr${f}(around:${radius},${from.lat},${from.lng});`).join("");
-  const query = `[out:json][timeout:20];(${parts});out center 150;`;
-  const res = await fetch(OVERPASS, { method: "POST", body: new URLSearchParams({ data: query }) });
-  if (!res.ok) throw new Error("overpass " + res.status);
-  return (await res.json()).elements || [];
-}
-
-function describePoi(tags, name) {
-  const bits = [];
-  if (tags.brand && tags.brand !== name) bits.push(tags.brand);
-  if (tags.cuisine) bits.push(tags.cuisine.split(";").slice(0, 2).join(", ").replace(/_/g, " "));
-  if (tags.opening_hours) bits.push(tags.opening_hours === "24/7" ? "Ανοιχτό 24ω" : tags.opening_hours);
-  const street = [tags["addr:street"], tags["addr:housenumber"]].filter(Boolean).join(" ");
-  if (street) bits.push(street);
-  return bits.join(" · ");
-}
-
-async function searchNearby(key, chip) {
-  const [label, icon, filters] = NEARBY[key];
-  setMode("places");
-  chip.classList.add("on");
-  chip.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
-  $("places-title").textContent = `${icon} ${label} κοντά σου`;
+function renderNearby(key, items, loading) {
+  const [label, icon] = POI.CATS[key];
   const list = $("places-list");
-  list.innerHTML = '<li class="empty">Ψάχνω…</li>';
   const from = origin();
-  let found = [];
-  try {
-    for (const radius of [2500, 10000, 30000]) {
-      found = await overpass(filters, from, radius);
-      if (found.length >= 5) break;
-    }
-  } catch {
-    if (state.mode === "places") list.innerHTML = '<li class="empty">Δεν απαντάει ο χάρτης. Δοκίμασε ξανά σε λίγο.</li>';
-    return;
-  }
-  if (state.mode !== "places" || !chip.classList.contains("on")) return; // άλλαξε στο μεταξύ
-
-  const items = found
-    .map((el) => {
-      const lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon;
-      if (lat == null) return null;
-      const tags = el.tags || {};
-      const name = tags.name || tags.brand || label;
-      return {
-        lat, lng, name,
-        sub: describePoi(tags, name),
-        dist: haversine([from.lat, from.lng], [lat, lng]),
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => a.dist - b.dist)
-    .slice(0, 25);
-
-  poiLayer.clearLayers();
   list.innerHTML = "";
+  if (loading) {
+    const li = document.createElement("li");
+    li.className = "loading";
+    li.textContent = items.length ? "Ανανέωση…" : "Ψάχνω…";
+    list.appendChild(li);
+  }
+  poiLayer.clearLayers();
   if (!items.length) {
-    list.innerHTML = '<li class="empty">Τίποτα εδώ γύρω. Έρημος, ρε!</li>';
+    if (!loading) list.innerHTML = '<li class="empty">Τίποτα εδώ γύρω. Έρημος, ρε!</li>';
     return;
   }
   const poiIcon = L.divIcon({ className: "poi-pin", html: `<div>${icon}</div>`, iconSize: [32, 32], iconAnchor: [16, 16] });
   for (const p of items) {
-    const li = placeRow(icon, p.name, p.sub, fmtShort(p.dist));
+    const li = placeRow(icon, p.name || label, p.sub, fmtShort(p.dist));
     li.onclick = () => previewDestination(p);
     list.appendChild(li);
     L.marker([p.lat, p.lng], { icon: poiIcon }).on("click", () => previewDestination(p)).addTo(poiLayer);
   }
   const bounds = L.latLngBounds(items.slice(0, 8).map((p) => [p.lat, p.lng])).extend([from.lat, from.lng]);
   map.fitBounds(bounds, fitPadding());
+}
+
+async function showNearby(key, chip) {
+  const [label, icon] = POI.CATS[key];
+  setMode("places");
+  chip.classList.add("on");
+  chip.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  $("places-title").textContent = `${icon} ${label} κοντά σου`;
+  const from = origin();
+  const stillHere = () => state.mode === "places" && chip.classList.contains("on");
+
+  // 1) αμέσως ό,τι έχουμε στο κινητό
+  let items = POI.nearby(key, from);
+  const fresh = POI.isFresh(from);
+  const wideDone = items.length >= 3 || POI.searchedWide(key, from);
+  renderNearby(key, items, !fresh || !wideDone);
+  if (fresh && wideDone) return;
+
+  // 2) ανανέωση της περιοχής στο παρασκήνιο, 3) αν είναι ακόμα λίγα, ψάξε πιο μακριά
+  try {
+    if (!fresh) await POI.refresh(from, { force: true });
+    if (!stillHere()) return;
+    items = POI.nearby(key, from);
+    if (items.length < 3 && !POI.searchedWide(key, from)) {
+      renderNearby(key, items, true);
+      items = await POI.liveSearch(key, from);
+    }
+  } catch {
+    if (!stillHere()) return;
+    items = POI.nearby(key, from);
+    if (!items.length) {
+      $("places-list").innerHTML = '<li class="empty">Δεν απαντάει ο χάρτης. Δοκίμασε ξανά σε λίγο.</li>';
+      return;
+    }
+  }
+  if (stillHere()) renderNearby(key, items, false);
 }
 
 $("places-close").onclick = () => setMode("home");
@@ -710,7 +937,7 @@ function parseRoute(r) {
       loc: [s.maneuver.location[1], s.maneuver.location[0]],
     };
   });
-  return {
+  return prepareRoute({
     coords, steps,
     distance: r.distance,
     duration: r.duration,
@@ -719,21 +946,14 @@ function parseRoute(r) {
     motorway: classes.has("motorway"),
     ferry: classes.has("ferry"),
     turns,
-  };
+  });
 }
 
 async function fetchRoutes(from, to, alternatives = true) {
-  const url = `${OSRM}${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=true&alternatives=${alternatives ? 3 : "false"}`;
-  const res = await fetch(url);
-  const data = await res.json();
+  const path = `${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=true&alternatives=${alternatives ? 3 : "false"}`;
+  const data = await Net.json(OSRM.map((base) => base + path), {}, 10000);
   if (data.code !== "Ok" || !data.routes.length) throw new Error(data.message || "no route");
   return data.routes.map(parseRoute).sort((a, b) => a.duration - b.duration);
-}
-
-function origin() {
-  if (state.pos) return state.pos;
-  const c = map.getCenter();
-  return { lat: c.lat, lng: c.lng, speed: null, accuracy: 0 };
 }
 
 // Δείχνει τις εναλλακτικές διαδρομές στον χάρτη για να διαλέξεις.
@@ -744,20 +964,22 @@ async function previewDestination(dest) {
   $("preview-title").textContent = state.dest.name;
   $("preview-sub").textContent = state.dest.sub;
   renderFavButton();
-  $("route-list").innerHTML = '<li class="empty">Βρίσκω διαδρομές…</li>';
+  $("route-list").innerHTML = '<li class="loading">Βρίσκω διαδρομές…</li>';
   $("go").disabled = true;
   routeLayer.clearLayers();
   if (destMarker) destMarker.remove();
   destMarker = L.marker([state.dest.lat, state.dest.lng], { icon: destIcon }).addTo(map);
+  const want = state.dest;
 
   let routes;
   try {
     routes = await fetchRoutes(origin(), state.dest);
   } catch {
+    if (state.mode !== "preview" || state.dest !== want) return;
     $("route-list").innerHTML = '<li class="empty">Δεν βρήκα δρόμο. Με βάρκα θα πας;</li>';
     return;
   }
-  if (state.mode !== "preview") return;
+  if (state.mode !== "preview" || state.dest !== want) return;
   state.routes = routes;
   state.selected = 0;
   $("go").disabled = false;
@@ -781,7 +1003,7 @@ function drawRouteOptions() {
     const r = state.routes[i];
     const sel = i === state.selected;
     if (sel) L.polyline(r.coords, { color: "#0b3d91", weight: 11, opacity: 0.9, interactive: false }).addTo(routeLayer);
-    const line = L.polyline(r.coords, { color: sel ? "#3d8bfd" : "#8e99a8", weight: sel ? 7 : 7, opacity: sel ? 1 : 0.85 });
+    const line = L.polyline(r.coords, { color: sel ? "#3d8bfd" : "#8e99a8", weight: 7, opacity: sel ? 1 : 0.85 });
     // πιο φαρδιά αόρατη γραμμή ώστε να πατιέται εύκολα με το δάχτυλο
     const hit = L.polyline(r.coords, { opacity: 0, weight: 26 });
     hit.on("click", (e) => {
@@ -851,53 +1073,68 @@ function drawNavRoute() {
   L.polyline(state.route.coords, { color: "#3d8bfd", weight: 6, opacity: 1 }).addTo(routeLayer);
 }
 
-function resetProgress() {
-  state.next = 1;
-  state.announced = { far: false, near: false };
-  state.minDist = Infinity;
+function setNavRoute(r) {
+  state.route = r;
+  state.next = -1; // θα οριστεί στην πρώτη θέση
+  state.announced = {};
   state.offCount = 0;
+  state.offRoute = false;
+  state.recalcSpoken = false;
+  state.arrived = false;
+  drawNavRoute();
 }
 
 function startNavigation() {
-  resetProgress();
   setMode("nav");
   state.navigating = true;
   state.follow = true;
-  drawNavRoute();
-  if (state.pos) map.setView([state.pos.lat, state.pos.lng], 17);
-  requestWakeLock();
-  const step = state.route.steps[state.next];
-  const d = state.pos ? haversine([state.pos.lat, state.pos.lng], step.loc) : state.route.steps[0].distance;
-  showStep(step, d, quip("start", "Ξεκινάμε"));
-  updateTrip(d);
+  setNavRoute(state.route);
+  setStatus("");
+  keepAwake(true);
+  const first = state.route.steps[1] || state.route.steps[0];
+  showStep(first, first.along, quip("start", "Ξεκινάμε"));
+  updateTrip(0);
+  if (state.pos) {
+    map.setView([state.pos.lat, state.pos.lng], 17);
+    guide(state.pos); // αμέσως η πρώτη οδηγία, χωρίς να περιμένουμε το επόμενο GPS
+  }
 }
 
 function stopNavigation() {
   state.navigating = false;
   stopSim();
   setMode("home");
+  setStatus("");
   state.route = null;
   renderDrawer();
-  if (state.wakeLock) state.wakeLock.release().catch(() => {});
-  state.wakeLock = null;
+  keepAwake(false);
 }
 $("stop").onclick = () => {
   stopNavigation();
   speak("Άντε, γεια.", true);
 };
 
+// Νέα διαδρομή όταν βγεις από τον δρόμο. Αν αποτύχει, ο φύλακας ξαναδοκιμάζει κάθε 5″.
 async function reroute() {
-  const now = Date.now();
-  if (now - state.lastReroute < 15000 || !state.dest || !state.pos) return;
-  state.lastReroute = now;
-  showStep(null, null, quip("recalc", "Επανυπολογισμός διαδρομής"));
-  $("instr").textContent = "Επανυπολογισμός…";
+  if (state.rerouting || !state.dest || !state.pos || !state.navigating) return;
+  state.rerouting = true;
+  state.lastReroute = Date.now();
+  if (!state.recalcSpoken) {
+    state.recalcSpoken = true;
+    showStep(null, null, quip("recalc", "Επανυπολογισμός διαδρομής"));
+    $("instr").textContent = "Επανυπολογισμός…";
+  }
+  setStatus("Βρίσκω νέα διαδρομή…");
   try {
-    [state.route] = await fetchRoutes(state.pos, state.dest, false);
-    drawNavRoute();
-    resetProgress();
+    const [r] = await fetchRoutes(state.pos, state.dest, false);
+    if (!state.navigating) return;
+    setNavRoute(r);
+    setStatus("");
+    guide(state.pos);
   } catch {
-    /* θα ξαναδοκιμάσει στην επόμενη απόκλιση */
+    setStatus("Δεν απαντάει ο χάρτης — ξαναδοκιμάζω…");
+  } finally {
+    state.rerouting = false;
   }
 }
 
@@ -908,12 +1145,11 @@ function showStep(step, dist, quipText) {
   if (quipText !== undefined) $("quip").textContent = quipText;
 }
 
-function updateTrip(distToNext) {
+function updateTrip(along) {
   const r = state.route;
-  let rest = distToNext;
-  for (let i = state.next; i < r.steps.length; i++) rest += r.steps[i].distance;
-  const secs = r.distance ? (rest / r.distance) * r.duration : 0;
-  $("eta-min").textContent = Math.max(1, Math.round(secs / 60));
+  const rest = Math.max(0, r.length - along);
+  const secs = r.length ? (rest / r.length) * r.duration : 0;
+  $("eta-min").textContent = Math.max(rest > 0 ? 1 : 0, Math.round(secs / 60));
   $("eta-km").textContent = fmtShort(rest);
   $("eta-clock").textContent = fmtClock(secs);
 }
@@ -927,9 +1163,27 @@ function onPosition(pos) {
   userMarker.setLatLng(here);
   if (!map.hasLayer(userMarker)) userMarker.addTo(map);
   if (first && state.mode === "home") map.setView(here, 16);
-  if (!state.navigating || !state.route) return;
+  saveLastPos(pos);
+  if (!state.navigating) POI.refresh(pos).catch(() => {}); // κοντινά μέρη στο παρασκήνιο
+  if (state.navigating && state.route) safe(() => guide(pos));
+}
 
-  if (state.follow) map.setView(here, Math.max(map.getZoom(), 16), { animate: true });
+let lastPosSave = 0;
+function saveLastPos(pos) {
+  if (Date.now() - lastPosSave < 30000) return;
+  lastPosSave = Date.now();
+  try {
+    localStorage.setItem("gps-mangas-last-pos", JSON.stringify({ lat: pos.lat, lng: pos.lng }));
+  } catch {}
+}
+
+// Η καρδιά της πλοήγησης: βρίσκει πού είσαι πάνω στη διαδρομή και ποια είναι η επόμενη στροφή.
+// Δεν χρειάζεται να περάσεις ακριβώς από το σημείο της στροφής — ακόμα κι αν το GPS
+// «πετάει» 50+ μέτρα δίπλα ή χάσει μερικές θέσεις, η επόμενη οδηγία βγαίνει σωστά.
+function guide(pos) {
+  const route = state.route;
+  const here = [pos.lat, pos.lng];
+  if (state.follow) map.panTo(here, { animate: true });
   const now = Date.now();
   const kmh = pos.speed != null ? pos.speed * 3.6 : null;
 
@@ -950,74 +1204,189 @@ function onPosition(pos) {
     state.stillSince = null;
   }
 
-  // εκτός διαδρομής
-  const off = distanceToRoute(here, state.route.coords);
-  if (off > OFF_ROUTE_M && (pos.accuracy || 0) < 50) {
-    if (++state.offCount >= 3) return void reroute();
+  // εκτός διαδρομής;
+  const loc = locate(route, here);
+  if (loc.off > OFF_ROUTE_M && (pos.accuracy || 0) < 60) {
+    if (++state.offCount >= 3) {
+      state.offRoute = true;
+      if (now - state.lastReroute > REROUTE_RETRY_MS) reroute();
+      return;
+    }
   } else {
     state.offCount = 0;
+    if (state.offRoute) {
+      // γύρισες μόνος σου στη διαδρομή
+      state.offRoute = false;
+      state.recalcSpoken = false;
+      setStatus("");
+    }
   }
+  if (state.offRoute) return;
 
-  const step = state.route.steps[state.next];
-  if (!step) return;
-  const d = haversine(here, step.loc);
-  state.minDist = Math.min(state.minDist, d);
+  const along = loc.along;
+  updateTrip(along);
+
+  // επόμενη στροφή = η πρώτη που δεν έχεις περάσει ακόμα
+  const steps = route.steps;
+  let idx = steps.findIndex((s, i) => i > 0 && s.along > along + PASSED_M);
+  if (idx < 0) idx = steps.length - 1;
+  // Μια στροφή που πέρασες δεν ξαναγυρίζει επειδή «πήδηξε» το GPS·
+  // μόνο αν όντως γύρισες πίσω πάνω από 60 μ.
+  if (state.next > 0 && idx < state.next && along > steps[state.next - 1].along - 60) idx = state.next;
+  if (idx !== state.next) {
+    if (state.next >= 0) $("quip").textContent = ""; // νέα στροφή: σβήσε την παλιά ατάκα
+    state.next = idx;
+    state.announced = {};
+  }
+  const step = steps[idx];
+  const d = Math.max(0, step.along - along);
   const instr = instruction(step);
-  updateTrip(d);
 
-  if (step.type === "arrive" && d < 30) {
-    showStep(step, null, quip("arrive", "Έφτασες στον προορισμό"));
-    state.navigating = false;
-    stopSim();
+  // άφιξη
+  if (step.type === "arrive" && (d < 25 || haversine(here, step.loc) < 30)) {
+    if (!state.arrived) {
+      state.arrived = true;
+      showStep(step, null, quip("arrive", "Έφτασες στον προορισμό"));
+      setStatus("");
+      stopSim();
+    }
     return;
   }
 
-  if (!state.announced.far && d < ANNOUNCE_FAR_M && d > ANNOUNCE_NEAR_M) {
-    state.announced.far = true;
-    if (settings.mode !== "quips") {
-      if (step.type === "arrive") speak(`Σε ${fmtDist(d)} φτάνεις στον προορισμό`);
-      else speak(`Σε ${fmtDist(d)}, ${instr.charAt(0).toLowerCase()}${instr.slice(1)}`);
+  // αποστάσεις ανάλογα με την ταχύτητα: στην εθνική ειδοποιεί νωρίτερα
+  const v = pos.speed != null && pos.speed > 1 ? pos.speed : 13;
+  const farDist = Math.min(800, Math.max(200, v * 15));
+  const nearDist = Math.min(120, Math.max(40, v * 3.5));
+  const a = state.announced;
+
+  // μόλις φανεί νέα στροφή μακριά: «Συνέχισε για 2 χλμ και μετά…» — για να ξέρεις ότι σε ακούει
+  if (!a.intro) {
+    a.intro = true;
+    if (d > farDist + 150 && settings.mode !== "quips") {
+      const then = step.type === "arrive" ? "φτάνεις στον προορισμό" : lowerFirst(instr);
+      speak(`Συνέχισε για ${fmtDist(d)}, και μετά ${then}`);
     }
   }
 
-  if (!state.announced.near && d <= ANNOUNCE_NEAR_M && step.type !== "arrive") {
-    state.announced.near = true;
+  if (!a.far && d <= farDist && d > nearDist) {
+    a.far = true;
+    if (settings.mode !== "quips") {
+      if (step.type === "arrive") speak(`Σε ${fmtDist(d)} φτάνεις στον προορισμό`);
+      else speak(`Σε ${fmtDist(d)}, ${lowerFirst(instr)}`);
+    }
+  }
+
+  if (!a.near && d <= nearDist && step.type !== "arrive") {
+    a.near = true;
+    a.far = true;
     showStep(step, d, quip(category(step), instr));
   } else {
     showStep(step, d);
   }
-
-  // πέρασε τη στροφή
-  if (d < 12 || (state.minDist < ANNOUNCE_NEAR_M && d > state.minDist + 15)) {
-    state.next++;
-    state.announced = { far: false, near: false };
-    state.minDist = Infinity;
-    const nxt = state.route.steps[state.next];
-    if (nxt) showStep(nxt, haversine(here, nxt.loc), "");
-  }
 }
 
-if ("geolocation" in navigator) {
-  navigator.geolocation.watchPosition(
-    (p) => {
-      if (state.simTimer) return; // η προσομοίωση έχει τον έλεγχο
-      onPosition({
-        lat: p.coords.latitude,
-        lng: p.coords.longitude,
-        speed: p.coords.speed,
-        accuracy: p.coords.accuracy,
-      });
-    },
-    () => {},
-    { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 }
+// ---------- GPS με αυτόματη επανεκκίνηση ----------
+
+let watchId = null;
+let prevFix = null;
+
+function startGps() {
+  if (!("geolocation" in navigator)) return;
+  state.lastGpsRestart = Date.now();
+  if (watchId != null) navigator.geolocation.clearWatch(watchId);
+  watchId = navigator.geolocation.watchPosition(onFix, onGpsError, {
+    enableHighAccuracy: true,
+    maximumAge: 0,
+    timeout: 15000,
+  });
+}
+
+function onFix(p) {
+  if (state.simTimer) return; // η προσομοίωση έχει τον έλεγχο
+  const now = Date.now();
+  let speed = p.coords.speed;
+  // το iPhone δίνει -1 ή τίποτα όταν δεν ξέρει την ταχύτητα: τη βγάζουμε από τις δύο τελευταίες θέσεις
+  if (speed == null || speed < 0 || Number.isNaN(speed)) {
+    speed = null;
+    if (prevFix && now - prevFix.t > 500 && now - prevFix.t < 10000) {
+      speed = haversine([prevFix.lat, prevFix.lng], [p.coords.latitude, p.coords.longitude]) / ((now - prevFix.t) / 1000);
+    }
+  }
+  prevFix = { lat: p.coords.latitude, lng: p.coords.longitude, t: now };
+  state.lastFix = now;
+  if (state.gpsLost) {
+    state.gpsLost = false;
+    setStatus("");
+    if (state.navigating) state.announced = {}; // ξαναπές την τρέχουσα οδηγία
+  }
+  safe(() =>
+    onPosition({ lat: p.coords.latitude, lng: p.coords.longitude, speed, accuracy: p.coords.accuracy })
   );
 }
 
-async function requestWakeLock() {
+function onGpsError(e) {
+  if (e.code === 1) {
+    state.gpsDenied = true;
+    toast("Δώσε άδεια τοποθεσίας: Ρυθμίσεις → Απόρρητο → Υπηρεσίες τοποθεσίας → Safari");
+  }
+  // για τα υπόλοιπα (χάθηκε σήμα, timeout) ο φύλακας κάνει επανεκκίνηση
+}
+
+// ---------- φύλακας: κάθε 2″ ελέγχει ότι όλα δουλεύουν και διορθώνει αμέσως ----------
+
+function watchdog() {
+  const now = Date.now();
+  if (state.simTimer) return;
+
+  // GPS σιωπηλό; επανεκκίνηση
+  if (!state.gpsDenied && now - state.lastFix > GPS_LOST_MS && now - state.lastGpsRestart > GPS_LOST_MS) startGps();
+  if (state.navigating && !state.arrived && now - state.lastFix > GPS_LOST_MS && !state.gpsLost) {
+    state.gpsLost = true;
+    setStatus("Ψάχνω σήμα GPS…");
+  }
+
+  if (!state.navigating) return;
+
+  // εκτός διαδρομής και απέτυχε ο υπολογισμός; ξαναδοκίμασε
+  if (state.offRoute && !state.rerouting && now - state.lastReroute > REROUTE_RETRY_MS) reroute();
+
+  // ο ήχος «κοιμήθηκε»;
+  if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+
+  // η οθόνη να μένει ανοιχτή
+  keepAwake(true);
+}
+setInterval(() => safe(watchdog), 2000);
+
+// Όταν ξαναγυρίσεις στην εφαρμογή (κλείδωμα οθόνης, άλλη εφαρμογή, κλήση): όλα από την αρχή, αμέσως.
+function resumeApp() {
+  if (document.hidden) return;
+  state.gpsDenied = false; // ίσως έδωσες άδεια στο μεταξύ
+  startGps();
+  if (audioCtx) audioCtx.resume().catch(() => {});
+  stopSound(); // ξεκολλάει τη φωνή αν είχε μείνει μισή φράση
+  if (state.navigating) {
+    keepAwake(true);
+    state.announced = {}; // θα ξαναπεί πού πάμε με την επόμενη θέση
+    if (state.pos && !state.simTimer) safe(() => guide(state.pos));
+  }
+}
+document.addEventListener("visibilitychange", resumeApp);
+window.addEventListener("pageshow", resumeApp);
+window.addEventListener("focus", resumeApp);
+
+// ---------- η οθόνη να μη σβήνει στην πλοήγηση ----------
+
+const noSleep = window.NoSleep ? new NoSleep() : null;
+function keepAwake(on) {
+  if (!noSleep) return;
   try {
-    if ("wakeLock" in navigator) state.wakeLock = await navigator.wakeLock.request("screen");
+    if (on && !noSleep.isEnabled) Promise.resolve(noSleep.enable()).catch(() => {});
+    if (!on && noSleep.isEnabled) noSleep.disable();
   } catch {}
 }
+// το iPhone επιτρέπει το «ξύπνημα» μόνο μετά από άγγιγμα — ξαναπροσπαθούμε σε κάθε άγγιγμα
+document.addEventListener("pointerdown", () => state.navigating && keepAwake(true));
 
 // ---------- προσομοίωση ----------
 
@@ -1030,7 +1399,6 @@ function stopSim() {
 $("sim").onclick = () => {
   if (state.simTimer) return stopSim();
   if (!state.route) return toast("Βάλε πρώτα προορισμό.");
-  if (!state.navigating) startNavigation();
   const coords = state.route.coords;
   const SPEED = 14; // m/s ≈ 50 χλμ/ώρα
   let i = 0, along = 0;
@@ -1234,5 +1602,8 @@ $("rec-file").onchange = async (e) => {
 Recordings.load();
 setMode("home");
 renderDrawer();
+startGps();
+// κοντινά μέρη για την τελευταία γνωστή θέση, πριν καν απαντήσει το GPS
+if (lastKnown) setTimeout(() => !state.pos && POI.refresh(lastKnown).catch(() => {}), 1500);
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
