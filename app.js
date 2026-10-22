@@ -1,8 +1,10 @@
 // GPS Μάγκας — πλοήγηση με ατάκες.
-// Χάρτης: OpenStreetMap, διαδρομές: OSRM, αναζήτηση: Nominatim, φωνή: Web Speech (el-GR).
+// Χάρτης: OpenStreetMap, διαδρομές: OSRM, αναζήτηση: Nominatim, κοντινά μέρη: Overpass,
+// φωνή: Web Speech (el-GR).
 
 const OSRM = "https://router.project-osrm.org/route/v1/driving/";
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
+const OVERPASS = "https://overpass-api.de/api/interpreter";
 
 const ANNOUNCE_FAR_M = 250;   // "Σε 200 μέτρα..."
 const ANNOUNCE_NEAR_M = 45;   // εδώ πέφτει η ατάκα
@@ -23,11 +25,32 @@ const CATEGORIES = {
   arrive: "Άφιξη",
 };
 
+// Κουμπιά «κοντά μου» στην κάτω μπάρα: [όνομα, εικονίδιο, φίλτρα OpenStreetMap]
+const NEARBY = {
+  fuel: ["Βενζίνη", "⛽", ['["amenity"="fuel"]']],
+  food: ["Φαγητό", "🍽", ['["amenity"~"^(restaurant|fast_food)$"]']],
+  cafe: ["Καφές", "☕", ['["amenity"="cafe"]']],
+  market: ["Σούπερ μάρκετ", "🛒", ['["shop"~"^(supermarket|convenience)$"]']],
+  pharmacy: ["Φαρμακείο", "💊", ['["amenity"="pharmacy"]']],
+  parking: ["Πάρκινγκ", "🅿️", ['["amenity"="parking"]']],
+  atm: ["ATM", "🏧", ['["amenity"~"^(atm|bank)$"]']],
+  ev: ["Φόρτιση EV", "🔌", ['["amenity"="charging_station"]']],
+  hotel: ["Ξενοδοχείο", "🏨", ['["tourism"~"^(hotel|motel|guest_house)$"]']],
+  hospital: ["Νοσοκομείο", "🏥", ['["amenity"~"^(hospital|clinic)$"]']],
+  carwash: ["Πλυντήριο", "🧽", ['["amenity"="car_wash"]']],
+  repair: ["Συνεργείο", "🔧", ['["shop"~"^(car_repair|tyres)$"]']],
+  wc: ["Τουαλέτα", "🚻", ['["amenity"="toilets"]']],
+};
+
 const $ = (id) => document.getElementById(id);
+
+// Το iPhone να μη μεγεθύνει τη σελίδα με τσίμπημα (ο χάρτης ζουμάρει κανονικά).
+document.addEventListener("gesturestart", (e) => e.preventDefault());
 
 // ---------- ρυθμίσεις ----------
 
 const DEFAULTS = {
+  units: "auto",    // auto | km | mi
   voiceURI: "",
   rate: 1,
   pitch: 1,
@@ -35,8 +58,10 @@ const DEFAULTS = {
   mode: "both",     // both | quips | plain | mute
   lang: "el",       // el | pnt | mix
   chime: true,
-  speedLimit: 120,
+  speedLimit: 120,  // πάντα σε χλμ/ώρα
   myAudio: "mix",   // mix | only | off
+  drawerOpen: false,
+  drawerTab: "history",
 };
 
 const settings = { ...DEFAULTS };
@@ -50,9 +75,49 @@ function saveSettings() {
   } catch {}
 }
 
+// ---------- μονάδες ----------
+
+function useMiles() {
+  if (settings.units === "mi") return true;
+  if (settings.units === "km") return false;
+  return /^(en-(US|LR|GB)|my)/i.test(navigator.language || "");
+}
+
+// Για τη φωνή.
+function fmtDist(m) {
+  if (useMiles()) {
+    if (m < 160) return Math.round((m * 3.281) / 50) * 50 + " πόδια";
+    return (m / 1609.34).toFixed(1).replace(".", ",") + " μίλια";
+  }
+  if (m >= 1000) return (m / 1000).toFixed(1).replace(".", ",") + " χιλιόμετρα";
+  return Math.round(m / 10) * 10 + " μέτρα";
+}
+
+// Για την οθόνη.
+function fmtShort(m) {
+  if (useMiles()) {
+    if (m < 160) return Math.round((m * 3.281) / 10) * 10 + " ft";
+    const mi = m / 1609.34;
+    return (mi < 10 ? mi.toFixed(1) : Math.round(mi)) + " mi";
+  }
+  if (m >= 1000) return (m < 10000 ? (m / 1000).toFixed(1).replace(".", ",") : Math.round(m / 1000)) + " χλμ";
+  return Math.round(m / 10) * 10 + " μ";
+}
+
+function fmtDuration(secs) {
+  const mins = Math.max(1, Math.round(secs / 60));
+  if (mins < 60) return `${mins} λεπ.`;
+  return `${Math.floor(mins / 60)} ώρ. ${mins % 60} λεπ.`;
+}
+
+function fmtClock(secsFromNow) {
+  return new Date(Date.now() + secsFromNow * 1000).toLocaleTimeString("el-GR", { hour: "2-digit", minute: "2-digit" });
+}
+
 // ---------- χάρτης ----------
 
-const map = L.map("map", { zoomControl: false }).setView([37.9838, 23.7275], 13);
+const map = L.map("map", { zoomControl: false, attributionControl: false }).setView([37.9838, 23.7275], 13);
+L.control.attribution({ position: "topright", prefix: false }).addTo(map);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
   attribution: "&copy; OpenStreetMap",
@@ -68,12 +133,16 @@ const destIcon = L.divIcon({
   iconAnchor: [16, 43],
 });
 let destMarker = null;
-let routeLine = null;
+const routeLayer = L.layerGroup().addTo(map);
+const poiLayer = L.layerGroup().addTo(map);
 
 const state = {
+  mode: "home",       // home | places | preview | nav
   pos: null,          // { lat, lng, speed (m/s) | null, accuracy }
-  dest: null,         // { lat, lng, name }
-  route: null,        // { coords: [[lat,lng]], steps: [...] }
+  dest: null,         // { lat, lng, name, sub }
+  routes: [],         // εναλλακτικές διαδρομές στην προεπισκόπηση
+  selected: 0,
+  route: null,        // η διαδρομή της πλοήγησης: { coords, steps, distance, duration, ... }
   next: 0,            // index of the next maneuver in route.steps
   announced: { far: false, near: false },
   minDist: Infinity,
@@ -90,10 +159,11 @@ const state = {
 };
 
 map.on("dragstart", () => {
-  if (!state.navigating && !state.pos) return;
+  if (!state.pos) return;
   state.follow = false;
   $("recenter").hidden = false;
 });
+map.on("click", () => ($("results").innerHTML = ""));
 $("recenter").onclick = () => {
   state.follow = true;
   $("recenter").hidden = true;
@@ -105,6 +175,30 @@ function toast(text) {
   $("toast").hidden = false;
   clearTimeout(toast.t);
   toast.t = setTimeout(() => ($("toast").hidden = true), 2500);
+}
+
+// Ποια κάρτα φαίνεται κάτω: αρχική, κοντινά, επιλογή διαδρομής ή πλοήγηση.
+function setMode(mode) {
+  state.mode = mode;
+  $("home-panel").hidden = mode !== "home";
+  $("places-panel").hidden = mode !== "places";
+  $("preview-panel").hidden = mode !== "preview";
+  $("navbar").hidden = mode !== "nav";
+  $("banner").hidden = mode !== "nav";
+  document.body.classList.toggle("navigating", mode === "nav");
+  if (mode !== "places") {
+    poiLayer.clearLayers();
+    document.querySelectorAll(".chip.on").forEach((c) => c.classList.remove("on"));
+  }
+  if (mode === "home") {
+    routeLayer.clearLayers();
+    if (destMarker) destMarker.remove();
+    destMarker = null;
+  }
+}
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 
 // ---------- ήχος ----------
@@ -281,16 +375,6 @@ function distanceToRoute(p, coords) {
   return best;
 }
 
-function fmtDist(m) {
-  if (m >= 1000) return (m / 1000).toFixed(1).replace(".", ",") + " χλμ";
-  return Math.round(m / 10) * 10 + " μέτρα";
-}
-
-function fmtShort(m) {
-  if (m >= 1000) return (m / 1000).toFixed(1).replace(".", ",") + " χλμ";
-  return Math.round(m / 10) * 10 + " μ";
-}
-
 // ---------- οδηγίες ----------
 
 const MOD = {
@@ -360,67 +444,290 @@ function arrowSvg(step) {
 $("search").addEventListener("submit", async (e) => {
   e.preventDefault();
   const q = $("dest").value.trim();
-  if (!q) return;
+  // Η μπάρα αδειάζει εντελώς μόλις πατηθεί «Πάμε».
+  $("dest").value = "";
   $("dest").blur();
-  const params = new URLSearchParams({ q, format: "json", limit: "6", "accept-language": "el" });
-  if (state.pos) {
-    const d = 1.5;
-    params.set("viewbox", [state.pos.lng - d, state.pos.lat + d, state.pos.lng + d, state.pos.lat - d].join(","));
-  }
-  $("results").innerHTML = "<li>Ψάχνω...</li>";
+  if (!q) return;
+  const params = new URLSearchParams({ q, format: "json", limit: "8", "accept-language": "el" });
+  const from = origin();
+  const d = 1.5;
+  params.set("viewbox", [from.lng - d, from.lat + d, from.lng + d, from.lat - d].join(","));
+  const list = $("results");
+  list.innerHTML = `<li class="head">Ψάχνω «${escapeHtml(q)}»…</li>`;
   try {
     const res = await fetch(`${NOMINATIM}?${params}`);
     const data = await res.json();
-    $("results").innerHTML = "";
     if (!data.length) {
-      $("results").innerHTML = "<li>Δεν το βρήκα. Γράψε το σωστά, ρε!</li>";
+      list.innerHTML = `<li class="empty">Δεν βρήκα «${escapeHtml(q)}». Γράψ' το σωστά, ρε!</li>`;
       return;
     }
+    list.innerHTML = `<li class="head">Αποτελέσματα για «${escapeHtml(q)}»</li>`;
     for (const r of data) {
       const [first, ...rest] = r.display_name.split(",");
-      const li = document.createElement("li");
-      li.textContent = first;
-      const small = document.createElement("small");
-      small.textContent = rest.join(",").trim();
-      li.appendChild(small);
+      const place = { lat: +r.lat, lng: +r.lon, name: first.trim(), sub: rest.join(",").trim() };
+      const dist = haversine([from.lat, from.lng], [place.lat, place.lng]);
+      const li = placeRow("📍", place.name, place.sub, fmtShort(dist));
       li.onclick = () => {
-        $("results").innerHTML = "";
-        $("dest").value = first;
-        setDestination({ lat: +r.lat, lng: +r.lon, name: r.display_name });
+        list.innerHTML = "";
+        previewDestination(place);
       };
-      $("results").appendChild(li);
+      list.appendChild(li);
     }
   } catch {
-    $("results").innerHTML = "<li>Δεν έχει ίντερνετ; Ούτε κι εγώ.</li>";
+    list.innerHTML = '<li class="empty">Δεν έχει ίντερνετ; Ούτε κι εγώ.</li>';
   }
 });
 
-// ---------- διαδρομή ----------
+function placeRow(icon, name, sub, right) {
+  const li = document.createElement("li");
+  li.innerHTML = `<div class="badge">${icon}</div>
+    <div class="body"><div class="name">${escapeHtml(name)}</div>${sub ? `<div class="sub">${escapeHtml(sub)}</div>` : ""}</div>
+    ${right ? `<div class="right">${escapeHtml(right)}</div>` : ""}`;
+  return li;
+}
 
-async function fetchRoute(from, to) {
-  const url = `${OSRM}${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=true`;
+// ---------- κοντινά μέρη (κάτω μπάρα) ----------
+
+for (const [key, [label, icon]] of Object.entries(NEARBY)) {
+  const b = document.createElement("button");
+  b.className = "chip";
+  b.dataset.key = key;
+  b.innerHTML = `<span>${icon}</span>${label}`;
+  b.onclick = () => searchNearby(key, b);
+  $("ribbon").appendChild(b);
+}
+
+async function overpass(filters, from, radius) {
+  const parts = filters.map((f) => `nwr${f}(around:${radius},${from.lat},${from.lng});`).join("");
+  const query = `[out:json][timeout:20];(${parts});out center 150;`;
+  const res = await fetch(OVERPASS, { method: "POST", body: new URLSearchParams({ data: query }) });
+  if (!res.ok) throw new Error("overpass " + res.status);
+  return (await res.json()).elements || [];
+}
+
+function describePoi(tags, name) {
+  const bits = [];
+  if (tags.brand && tags.brand !== name) bits.push(tags.brand);
+  if (tags.cuisine) bits.push(tags.cuisine.split(";").slice(0, 2).join(", ").replace(/_/g, " "));
+  if (tags.opening_hours) bits.push(tags.opening_hours === "24/7" ? "Ανοιχτό 24ω" : tags.opening_hours);
+  const street = [tags["addr:street"], tags["addr:housenumber"]].filter(Boolean).join(" ");
+  if (street) bits.push(street);
+  return bits.join(" · ");
+}
+
+async function searchNearby(key, chip) {
+  const [label, icon, filters] = NEARBY[key];
+  setMode("places");
+  chip.classList.add("on");
+  chip.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  $("places-title").textContent = `${icon} ${label} κοντά σου`;
+  const list = $("places-list");
+  list.innerHTML = '<li class="empty">Ψάχνω…</li>';
+  const from = origin();
+  let found = [];
+  try {
+    for (const radius of [2500, 10000, 30000]) {
+      found = await overpass(filters, from, radius);
+      if (found.length >= 5) break;
+    }
+  } catch {
+    if (state.mode === "places") list.innerHTML = '<li class="empty">Δεν απαντάει ο χάρτης. Δοκίμασε ξανά σε λίγο.</li>';
+    return;
+  }
+  if (state.mode !== "places" || !chip.classList.contains("on")) return; // άλλαξε στο μεταξύ
+
+  const items = found
+    .map((el) => {
+      const lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon;
+      if (lat == null) return null;
+      const tags = el.tags || {};
+      const name = tags.name || tags.brand || label;
+      return {
+        lat, lng, name,
+        sub: describePoi(tags, name),
+        dist: haversine([from.lat, from.lng], [lat, lng]),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, 25);
+
+  poiLayer.clearLayers();
+  list.innerHTML = "";
+  if (!items.length) {
+    list.innerHTML = '<li class="empty">Τίποτα εδώ γύρω. Έρημος, ρε!</li>';
+    return;
+  }
+  const poiIcon = L.divIcon({ className: "poi-pin", html: `<div>${icon}</div>`, iconSize: [32, 32], iconAnchor: [16, 16] });
+  for (const p of items) {
+    const li = placeRow(icon, p.name, p.sub, fmtShort(p.dist));
+    li.onclick = () => previewDestination(p);
+    list.appendChild(li);
+    L.marker([p.lat, p.lng], { icon: poiIcon }).on("click", () => previewDestination(p)).addTo(poiLayer);
+  }
+  const bounds = L.latLngBounds(items.slice(0, 8).map((p) => [p.lat, p.lng])).extend([from.lat, from.lng]);
+  map.fitBounds(bounds, fitPadding());
+}
+
+$("places-close").onclick = () => setMode("home");
+
+// Περιθώρια ώστε ό,τι δείχνουμε να μην κρύβεται κάτω από την αναζήτηση ή τις κάρτες.
+function fitPadding() {
+  const top = $("top").getBoundingClientRect().bottom + 20;
+  const bottom = window.innerHeight - $("bottom").getBoundingClientRect().top + 20;
+  return { paddingTopLeft: [30, top], paddingBottomRight: [30, Math.max(bottom, 40)] };
+}
+
+// ---------- πρόσφατα & αγαπημένα ----------
+
+function renderDrawer() {
+  const open = settings.drawerOpen;
+  $("drawer").classList.toggle("open", open);
+  $("drawer-body").hidden = !open;
+  document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === settings.drawerTab));
+  if (!open) return;
+  const listName = settings.drawerTab;
+  const items = listName === "history" ? Places.history() : Places.favorites();
+  const ul = $("saved-list");
+  ul.innerHTML = "";
+  if (!items.length) {
+    ul.innerHTML = `<li class="empty">${listName === "history" ? "Δεν έχεις πάει πουθενά ακόμα." : "Πάτα ⋯ σε έναν προορισμό ή ☆ στη διαδρομή για να μπει εδώ."}</li>`;
+    return;
+  }
+  for (const p of items) {
+    const icon = Places.isFavorite(p) ? "★" : "🕘";
+    const right = state.pos ? fmtShort(haversine([state.pos.lat, state.pos.lng], [p.lat, p.lng])) : "";
+    const li = placeRow(icon, p.name, p.sub, right);
+    const more = document.createElement("button");
+    more.className = "more";
+    more.setAttribute("aria-label", "Επιλογές");
+    more.textContent = "⋯";
+    more.onclick = (e) => {
+      e.stopPropagation();
+      placeActions(listName, p);
+    };
+    li.appendChild(more);
+    li.onclick = () => previewDestination(p);
+    ul.appendChild(li);
+  }
+}
+
+$("drawer-toggle").onclick = () => {
+  settings.drawerOpen = !settings.drawerOpen;
+  saveSettings();
+  renderDrawer();
+};
+document.querySelectorAll(".tabs button").forEach((b) => {
+  b.onclick = () => {
+    settings.drawerTab = b.dataset.tab;
+    saveSettings();
+    renderDrawer();
+  };
+});
+
+function openActions(title, buttons) {
+  $("actions-title").textContent = title;
+  const box = $("actions-buttons");
+  box.innerHTML = "";
+  for (const { label, danger, fn } of buttons) {
+    const b = document.createElement("button");
+    b.className = "pill" + (danger ? " danger" : "");
+    b.textContent = label;
+    b.onclick = () => {
+      $("actions").hidden = true;
+      fn();
+    };
+    box.appendChild(b);
+  }
+  $("actions").hidden = false;
+}
+$("actions-cancel").onclick = () => ($("actions").hidden = true);
+$("actions").onclick = (e) => {
+  if (e.target === $("actions")) $("actions").hidden = true;
+};
+
+function placeActions(listName, p) {
+  const fav = Places.isFavorite(p);
+  const buttons = [
+    { label: "🧭  Διαδρομές προς τα εκεί", fn: () => previewDestination(p) },
+    {
+      label: fav ? "☆  Αφαίρεση από τα αγαπημένα" : "★  Προσθήκη στα αγαπημένα",
+      fn: () => {
+        toast(Places.toggleFavorite(p) ? "Μπήκε στα αγαπημένα" : "Βγήκε από τα αγαπημένα");
+        renderDrawer();
+      },
+    },
+    {
+      label: "✏️  Μετονομασία",
+      fn: () => {
+        const name = prompt("Νέο όνομα:", p.name);
+        if (name && name.trim()) {
+          Places.rename(listName, p.id, name.trim());
+          renderDrawer();
+        }
+      },
+    },
+    {
+      label: listName === "history" ? "🗑  Διαγραφή από τα πρόσφατα" : "🗑  Διαγραφή από τα αγαπημένα",
+      danger: true,
+      fn: () => {
+        Places.remove(listName, p.id);
+        renderDrawer();
+      },
+    },
+  ];
+  if (listName === "history") {
+    buttons.push({
+      label: "🧹  Καθάρισμα όλων των πρόσφατων",
+      danger: true,
+      fn: () => {
+        if (confirm("Να σβηστούν όλα τα πρόσφατα;")) {
+          Places.clearHistory();
+          renderDrawer();
+        }
+      },
+    });
+  }
+  openActions(p.name, buttons);
+}
+
+// ---------- διαδρομές ----------
+
+function parseRoute(r) {
+  const coords = r.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+  const classes = new Set();
+  let turns = 0;
+  const steps = r.legs[0].steps.map((s) => {
+    for (const it of s.intersections || []) for (const c of it.classes || []) classes.add(c);
+    const t = s.maneuver.type, m = s.maneuver.modifier || "";
+    if (t !== "depart" && t !== "arrive" && (/left|right|uturn/.test(m) || t.includes("roundabout"))) turns++;
+    return {
+      type: t,
+      modifier: s.maneuver.modifier,
+      exit: s.maneuver.exit,
+      name: s.name,
+      distance: s.distance || 0,
+      loc: [s.maneuver.location[1], s.maneuver.location[0]],
+    };
+  });
+  return {
+    coords, steps,
+    distance: r.distance,
+    duration: r.duration,
+    via: r.legs[0].summary || "",
+    toll: classes.has("toll"),
+    motorway: classes.has("motorway"),
+    ferry: classes.has("ferry"),
+    turns,
+  };
+}
+
+async function fetchRoutes(from, to, alternatives = true) {
+  const url = `${OSRM}${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=true&alternatives=${alternatives ? 3 : "false"}`;
   const res = await fetch(url);
   const data = await res.json();
   if (data.code !== "Ok" || !data.routes.length) throw new Error(data.message || "no route");
-  const r = data.routes[0];
-  const coords = r.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
-  const steps = r.legs[0].steps.map((s) => ({
-    type: s.maneuver.type,
-    modifier: s.maneuver.modifier,
-    exit: s.maneuver.exit,
-    name: s.name,
-    distance: s.distance || 0,
-    loc: [s.maneuver.location[1], s.maneuver.location[0]],
-  }));
-  return { coords, steps, distance: r.distance, duration: r.duration };
-}
-
-function drawRoute() {
-  if (routeLine) routeLine.remove();
-  routeLine = L.layerGroup([
-    L.polyline(state.route.coords, { color: "#0b3d91", weight: 10, opacity: 0.9 }),
-    L.polyline(state.route.coords, { color: "#3d8bfd", weight: 6, opacity: 1 }),
-  ]).addTo(map);
+  return data.routes.map(parseRoute).sort((a, b) => a.duration - b.duration);
 }
 
 function origin() {
@@ -429,20 +736,119 @@ function origin() {
   return { lat: c.lat, lng: c.lng, speed: null, accuracy: 0 };
 }
 
-async function setDestination(dest) {
-  state.dest = dest;
+// Δείχνει τις εναλλακτικές διαδρομές στον χάρτη για να διαλέξεις.
+async function previewDestination(dest) {
+  state.dest = { lat: +dest.lat, lng: +dest.lng, name: dest.name, sub: dest.sub || "" };
+  $("results").innerHTML = "";
+  setMode("preview");
+  $("preview-title").textContent = state.dest.name;
+  $("preview-sub").textContent = state.dest.sub;
+  renderFavButton();
+  $("route-list").innerHTML = '<li class="empty">Βρίσκω διαδρομές…</li>';
+  $("go").disabled = true;
+  routeLayer.clearLayers();
   if (destMarker) destMarker.remove();
-  destMarker = L.marker([dest.lat, dest.lng], { icon: destIcon }).addTo(map);
+  destMarker = L.marker([state.dest.lat, state.dest.lng], { icon: destIcon }).addTo(map);
+
+  let routes;
   try {
-    state.route = await fetchRoute(origin(), dest);
+    routes = await fetchRoutes(origin(), state.dest);
   } catch {
-    toast("Δεν βρήκα δρόμο. Με βάρκα θα πας;");
-    speak("Δεν βρήκα δρόμο. Με βάρκα θα πας;", true);
+    $("route-list").innerHTML = '<li class="empty">Δεν βρήκα δρόμο. Με βάρκα θα πας;</li>';
     return;
   }
-  drawRoute();
-  map.fitBounds(L.latLngBounds(state.route.coords), { padding: [60, 60] });
+  if (state.mode !== "preview") return;
+  state.routes = routes;
+  state.selected = 0;
+  $("go").disabled = false;
+  selectRoute(0, true);
+}
+
+function selectRoute(i, fit = false) {
+  state.selected = i;
+  drawRouteOptions();
+  renderRouteCards();
+  if (fit) {
+    const b = L.latLngBounds(state.routes.flatMap((r) => r.coords));
+    map.fitBounds(b, fitPadding());
+  }
+}
+
+function drawRouteOptions() {
+  routeLayer.clearLayers();
+  const order = state.routes.map((_, i) => i).filter((i) => i !== state.selected).concat(state.selected);
+  for (const i of order) {
+    const r = state.routes[i];
+    const sel = i === state.selected;
+    if (sel) L.polyline(r.coords, { color: "#0b3d91", weight: 11, opacity: 0.9, interactive: false }).addTo(routeLayer);
+    const line = L.polyline(r.coords, { color: sel ? "#3d8bfd" : "#8e99a8", weight: sel ? 7 : 7, opacity: sel ? 1 : 0.85 });
+    // πιο φαρδιά αόρατη γραμμή ώστε να πατιέται εύκολα με το δάχτυλο
+    const hit = L.polyline(r.coords, { opacity: 0, weight: 26 });
+    hit.on("click", (e) => {
+      L.DomEvent.stopPropagation(e);
+      selectRoute(i);
+    });
+    line.addTo(routeLayer);
+    hit.addTo(routeLayer);
+    // ετικέτα με χρόνο/απόσταση, σε διαφορετικό σημείο για κάθε διαδρομή
+    const at = r.coords[Math.floor(r.coords.length * (0.35 + 0.15 * (i % 3)))];
+    L.marker(at, {
+      icon: L.divIcon({ className: "route-label" + (sel ? " sel" : ""), html: `<div>${fmtDuration(r.duration)}</div>`, iconSize: [0, 0] }),
+      zIndexOffset: sel ? 1000 : 0,
+    }).on("click", () => selectRoute(i)).addTo(routeLayer);
+  }
+}
+
+function renderRouteCards() {
+  const ul = $("route-list");
+  ul.innerHTML = "";
+  const fastest = state.routes[0].duration;
+  state.routes.forEach((r, i) => {
+    const li = document.createElement("li");
+    li.className = "route" + (i === state.selected ? " sel" : "");
+    const extra = Math.round((r.duration - fastest) / 60);
+    const tag = i === 0 ? '<span class="tag">Ταχύτερη</span>' : `<span class="tag slow">+${extra} λεπ.</span>`;
+    const flags = [
+      `<span>🕐 άφιξη ${fmtClock(r.duration)}</span>`,
+      `<span>↪ ${r.turns} ${r.turns === 1 ? "στροφή" : "στροφές"}</span>`,
+      r.motorway ? "<span>🛣 Αυτοκινητόδρομος</span>" : "<span>🏘 Χωρίς αυτοκινητόδρομο</span>",
+      r.toll ? '<span class="warn">💶 Διόδια</span>' : "<span>Χωρίς διόδια</span>",
+      r.ferry ? '<span class="warn">⛴ Πλοίο</span>' : "",
+    ].join("");
+    li.innerHTML = `
+      <div class="line1"><span class="time">${fmtDuration(r.duration)}</span><span class="dist">${fmtShort(r.distance)}</span>${tag}</div>
+      ${r.via ? `<div class="via">μέσω ${escapeHtml(r.via)}</div>` : ""}
+      <div class="flags">${flags}</div>`;
+    li.onclick = () => selectRoute(i);
+    ul.appendChild(li);
+  });
+}
+
+function renderFavButton() {
+  const fav = state.dest && Places.isFavorite(state.dest);
+  $("preview-fav").textContent = fav ? "★" : "☆";
+  $("preview-fav").classList.toggle("on", fav);
+}
+$("preview-fav").onclick = () => {
+  if (!state.dest) return;
+  toast(Places.toggleFavorite(state.dest) ? "Μπήκε στα αγαπημένα" : "Βγήκε από τα αγαπημένα");
+  renderFavButton();
+};
+$("preview-close").onclick = () => {
+  setMode("home");
+  renderDrawer();
+};
+$("go").onclick = () => {
+  if (!state.routes.length) return;
+  Places.addHistory(state.dest);
+  state.route = state.routes[state.selected];
   startNavigation();
+};
+
+function drawNavRoute() {
+  routeLayer.clearLayers();
+  L.polyline(state.route.coords, { color: "#0b3d91", weight: 10, opacity: 0.9 }).addTo(routeLayer);
+  L.polyline(state.route.coords, { color: "#3d8bfd", weight: 6, opacity: 1 }).addTo(routeLayer);
 }
 
 function resetProgress() {
@@ -454,10 +860,11 @@ function resetProgress() {
 
 function startNavigation() {
   resetProgress();
+  setMode("nav");
   state.navigating = true;
   state.follow = true;
-  document.body.classList.add("navigating");
-  $("navbar").hidden = false;
+  drawNavRoute();
+  if (state.pos) map.setView([state.pos.lat, state.pos.lng], 17);
   requestWakeLock();
   const step = state.route.steps[state.next];
   const d = state.pos ? haversine([state.pos.lat, state.pos.lng], step.loc) : state.route.steps[0].distance;
@@ -468,13 +875,9 @@ function startNavigation() {
 function stopNavigation() {
   state.navigating = false;
   stopSim();
-  document.body.classList.remove("navigating");
-  $("navbar").hidden = true;
-  $("banner").hidden = true;
-  if (routeLine) routeLine.remove();
-  if (destMarker) destMarker.remove();
-  routeLine = destMarker = null;
+  setMode("home");
   state.route = null;
+  renderDrawer();
   if (state.wakeLock) state.wakeLock.release().catch(() => {});
   state.wakeLock = null;
 }
@@ -490,8 +893,8 @@ async function reroute() {
   showStep(null, null, quip("recalc", "Επανυπολογισμός διαδρομής"));
   $("instr").textContent = "Επανυπολογισμός…";
   try {
-    state.route = await fetchRoute(state.pos, state.dest);
-    drawRoute();
+    [state.route] = await fetchRoutes(state.pos, state.dest, false);
+    drawNavRoute();
     resetProgress();
   } catch {
     /* θα ξαναδοκιμάσει στην επόμενη απόκλιση */
@@ -499,7 +902,6 @@ async function reroute() {
 }
 
 function showStep(step, dist, quipText) {
-  $("banner").hidden = false;
   $("arrow").innerHTML = arrowSvg(step);
   $("dist").textContent = dist != null ? fmtShort(dist) : "";
   $("instr").textContent = step ? instruction(step) : "";
@@ -511,22 +913,20 @@ function updateTrip(distToNext) {
   let rest = distToNext;
   for (let i = state.next; i < r.steps.length; i++) rest += r.steps[i].distance;
   const secs = r.distance ? (rest / r.distance) * r.duration : 0;
-  const arrive = new Date(Date.now() + secs * 1000);
   $("eta-min").textContent = Math.max(1, Math.round(secs / 60));
   $("eta-km").textContent = fmtShort(rest);
-  $("eta-clock").textContent = arrive.toLocaleTimeString("el-GR", { hour: "2-digit", minute: "2-digit" });
+  $("eta-clock").textContent = fmtClock(secs);
 }
 
 // ---------- κάθε νέα θέση ----------
 
 function onPosition(pos) {
+  const first = !state.pos;
   state.pos = pos;
   const here = [pos.lat, pos.lng];
   userMarker.setLatLng(here);
-  if (!map.hasLayer(userMarker)) {
-    userMarker.addTo(map);
-    if (!state.navigating) map.setView(here, 16);
-  }
+  if (!map.hasLayer(userMarker)) userMarker.addTo(map);
+  if (first && state.mode === "home") map.setView(here, 16);
   if (!state.navigating || !state.route) return;
 
   if (state.follow) map.setView(here, Math.max(map.getZoom(), 16), { animate: true });
@@ -696,7 +1096,7 @@ $("settings").onclick = (e) => {
   if (e.target === $("settings")) $("settings").hidden = true;
 };
 
-function bindSetting(id, key, { output, format = (v) => v, parse = (v) => v } = {}) {
+function bindSetting(id, key, { output, format = (v) => v, parse = (v) => v, onChange } = {}) {
   const el = $(id);
   const isBox = el.type === "checkbox";
   if (isBox) el.checked = settings[key];
@@ -707,21 +1107,33 @@ function bindSetting(id, key, { output, format = (v) => v, parse = (v) => v } = 
     settings[key] = isBox ? el.checked : parse(el.value);
     show();
     saveSettings();
-    if (key === "mode") {
-      renderMute();
-      if (settings.mode !== "mute") modeBeforeMute = settings.mode;
-    }
+    if (onChange) onChange();
   });
+  return show;
 }
 
+const speedLabel = (v) => (useMiles() ? `${Math.round(v * 0.621)} mph` : `${v} χλμ/ώρα`);
+
+const showSpeed = bindSetting("s-speed", "speedLimit", { output: "o-speed", parse: Number, format: speedLabel });
+bindSetting("s-units", "units", {
+  onChange: () => {
+    showSpeed();
+    renderDrawer();
+    if (state.mode === "preview" && state.routes.length) renderRouteCards();
+  },
+});
 bindSetting("s-voice", "voiceURI");
 bindSetting("s-rate", "rate", { output: "o-rate", parse: Number, format: (v) => v.toFixed(1) + "×" });
 bindSetting("s-pitch", "pitch", { output: "o-pitch", parse: Number, format: (v) => v.toFixed(1) });
 bindSetting("s-volume", "volume", { output: "o-volume", parse: Number, format: (v) => Math.round(v * 100) + "%" });
-bindSetting("s-mode", "mode");
+bindSetting("s-mode", "mode", {
+  onChange: () => {
+    renderMute();
+    if (settings.mode !== "mute") modeBeforeMute = settings.mode;
+  },
+});
 bindSetting("s-lang", "lang");
 bindSetting("s-chime", "chime");
-bindSetting("s-speed", "speedLimit", { output: "o-speed", parse: Number, format: (v) => v + " χλμ/ώρα" });
 bindSetting("s-myaudio", "myAudio");
 renderMute();
 
@@ -817,6 +1229,10 @@ $("rec-file").onchange = async (e) => {
   toast("Προστέθηκε!");
 };
 
+// ---------- εκκίνηση ----------
+
 Recordings.load();
+setMode("home");
+renderDrawer();
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
