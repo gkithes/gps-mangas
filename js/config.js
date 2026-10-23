@@ -13,6 +13,10 @@ export const SERVERS = {
     "https://overpass.kumi.systems/api/interpreter",
   ],
   tiles: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  // Δορυφόρος: δωρεάν παγκόσμιες εικόνες της Esri, με δρόμους και ονόματα από πάνω
+  satellite: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  satRoads: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
+  satLabels: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
 };
 
 export const NAV = {

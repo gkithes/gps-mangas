@@ -9,6 +9,7 @@ const SETTINGS_KEY = "gps-mangas-settings";
 
 export const DEFAULTS = {
   units: "auto",    // auto | km | mi
+  mapStyle: "map",  // map | satellite
   voiceURI: "",
   rate: 1,
   pitch: 1,

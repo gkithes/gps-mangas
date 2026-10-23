@@ -2,7 +2,7 @@
 
 import { SERVERS, DEFAULT_VIEW } from "./config.js";
 import { $, escapeHtml } from "./util.js";
-import { lastPos } from "./store.js";
+import { lastPos, settings, saveSettings } from "./store.js";
 import { state } from "./state.js";
 
 // ---------- χάρτης ----------
@@ -10,7 +10,37 @@ import { state } from "./state.js";
 const start = lastPos.value || DEFAULT_VIEW;
 export const map = L.map("map", { zoomControl: false, attributionControl: false }).setView([start.lat, start.lng], lastPos.value ? 15 : DEFAULT_VIEW.zoom);
 L.control.attribution({ position: "topright", prefix: false }).addTo(map);
-L.tileLayer(SERVERS.tiles, { maxZoom: 19, attribution: "&copy; OpenStreetMap" }).addTo(map);
+
+// ---------- χάρτης ή δορυφόρος ----------
+
+const BASE = {
+  map: L.tileLayer(SERVERS.tiles, { maxZoom: 19, attribution: "&copy; OpenStreetMap" }),
+  satellite: L.layerGroup([
+    L.tileLayer(SERVERS.satellite, { maxZoom: 19, maxNativeZoom: 18, attribution: "Εικόνες &copy; Esri" }),
+    L.tileLayer(SERVERS.satRoads, { maxZoom: 19, maxNativeZoom: 18 }),
+    L.tileLayer(SERVERS.satLabels, { maxZoom: 19, maxNativeZoom: 18 }),
+  ]),
+};
+
+export function setMapStyle(style) {
+  if (!BASE[style]) style = "map";
+  for (const [k, layer] of Object.entries(BASE)) {
+    if (k === style) layer.addTo(map);
+    else layer.remove();
+  }
+  settings.mapStyle = style;
+  saveSettings();
+  // το κουμπί δείχνει σε τι θα αλλάξει
+  $("map-style").textContent = style === "map" ? "🛰" : "🗺";
+  $("map-style").setAttribute("aria-label", style === "map" ? "Δορυφόρος" : "Χάρτης");
+  $("s-mapstyle").value = style;
+}
+setMapStyle(settings.mapStyle);
+$("map-style").onclick = () => {
+  setMapStyle(settings.mapStyle === "map" ? "satellite" : "map");
+  toast(settings.mapStyle === "map" ? "Χάρτης" : "Δορυφόρος");
+};
+$("s-mapstyle").onchange = (e) => setMapStyle(e.target.value);
 
 export const layers = {
   route: L.layerGroup().addTo(map),

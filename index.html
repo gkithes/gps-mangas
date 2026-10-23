@@ -39,14 +39,29 @@
       <div id="dist"></div>
       <div id="instr"></div>
     </div>
+    <div id="then" hidden>
+      <span class="then-label">Μετά</span>
+      <svg id="then-arrow" viewBox="0 0 48 48"></svg>
+      <span id="then-instr"></span>
+      <span id="then-dist"></span>
+    </div>
     <div id="quip"></div>
     <div id="status" hidden></div>
+    <button id="steps-toggle" class="steps-toggle">☰ Όλες οι στροφές <span class="chev">▾</span></button>
+  </div>
+
+  <!-- πλοήγηση: όλες οι επόμενες στροφές -->
+  <div id="steps" class="card" hidden>
+    <ul id="steps-list" class="list"></ul>
   </div>
 
   <div id="bottom">
-    <button id="recenter" class="fab" aria-label="Κέντρο" hidden>
-      <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-    </button>
+    <div class="fabs">
+      <button id="map-style" class="fab" aria-label="Δορυφόρος">🛰</button>
+      <button id="recenter" class="fab" aria-label="Κέντρο" hidden>
+        <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      </button>
+    </div>
 
     <!-- αρχική: κοντινά + πρόσφατα/αγαπημένα -->
     <div id="home-panel">
@@ -128,6 +143,12 @@
             <option value="auto">Αυτόματα (από τη γλώσσα του κινητού)</option>
             <option value="km">Χιλιόμετρα</option>
             <option value="mi">Μίλια</option>
+          </select>
+        </label>
+        <label>Εμφάνιση χάρτη
+          <select id="s-mapstyle">
+            <option value="map">Χάρτης (δρόμοι)</option>
+            <option value="satellite">Δορυφόρος</option>
           </select>
         </label>
       </section>

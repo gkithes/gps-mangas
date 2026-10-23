@@ -25,6 +25,50 @@ function showStep(step, dist, quipText) {
   if (quipText !== undefined) $("quip").textContent = quipText;
 }
 
+// «Μετά: ↱ Στρίψε δεξιά σε 300 μ» και η λίστα με όλες τις επόμενες στροφές.
+let stepsOpen = false;
+
+function showUpcoming(along) {
+  const steps = state.route.steps;
+  const idx = Math.max(1, state.next);
+  const cur = steps[idx];
+  const nxt = steps[idx + 1];
+  const then = !!nxt && cur.type !== "arrive";
+  $("then").hidden = !then;
+  if (then) {
+    $("then-arrow").innerHTML = arrowSvg(nxt);
+    $("then-instr").textContent = instruction(nxt);
+    $("then-dist").textContent = shortDist(Math.max(0, nxt.along - cur.along));
+  }
+  if (stepsOpen) renderSteps(along, idx);
+}
+
+function renderSteps(along, idx) {
+  const ul = $("steps-list");
+  ul.innerHTML = "";
+  state.route.steps.slice(idx).forEach((s, i) => {
+    const li = document.createElement("li");
+    if (i === 0) li.className = "current";
+    li.innerHTML = `<div class="badge"><svg viewBox="0 0 48 48">${arrowSvg(s)}</svg></div>
+      <div class="body"><div class="name"></div></div><div class="right"></div>`;
+    li.querySelector(".name").textContent = instruction(s);
+    li.querySelector(".right").textContent = shortDist(Math.max(0, s.along - along));
+    ul.appendChild(li);
+  });
+  $("steps").style.top = `${$("banner").getBoundingClientRect().bottom + 8}px`;
+}
+
+function setStepsOpen(open) {
+  stepsOpen = open && state.navigating;
+  $("steps").hidden = !stepsOpen;
+  $("steps-toggle").classList.toggle("open", stepsOpen);
+  if (stepsOpen) renderSteps(lastAlong, Math.max(1, state.next));
+}
+$("steps-toggle").onclick = () => setStepsOpen(!stepsOpen);
+$("steps").onclick = () => setStepsOpen(false);
+
+let lastAlong = 0;
+
 function showTrip(along) {
   const r = state.route;
   const rest = Math.max(0, r.length - along);
@@ -51,6 +95,8 @@ export function startNavigation(route) {
   const first = route.steps[1] || route.steps[0];
   showStep(first, first.along, quip("start", "Ξεκινάμε"));
   showTrip(0);
+  lastAlong = 0;
+  showUpcoming(0);
   if (state.pos) {
     map.setView([state.pos.lat, state.pos.lng], 17);
     guide(state.pos); // αμέσως η πρώτη οδηγία, χωρίς να περιμένουμε το επόμενο GPS
@@ -59,6 +105,7 @@ export function startNavigation(route) {
 
 export function stopNavigation() {
   state.navigating = false;
+  setStepsOpen(false);
   stopSim();
   state.route = null;
   setStatus("");
@@ -154,6 +201,8 @@ export function guide(pos) {
   const step = steps[idx];
   const d = Math.max(0, step.along - along);
   const instr = instruction(step);
+  lastAlong = along;
+  showUpcoming(along);
 
   // άφιξη
   if (step.type === "arrive" && (d < NAV.ARRIVE_M || haversine(here, step.loc) < 30)) {

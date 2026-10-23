@@ -1,7 +1,7 @@
 // Service worker: η εφαρμογή ανοίγει αμέσως από τη μνήμη του κινητού και ενημερώνεται
 // στο παρασκήνιο. Κρατάει και τα κομμάτια του χάρτη που έχεις δει.
 
-const VERSION = "v2.0.0";
+const VERSION = "v2.1.0";
 const APP = `gps-mangas-app-${VERSION}`;
 const TILES = "gps-mangas-tiles";
 const MAX_TILES = 1500;
@@ -55,5 +55,5 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   const url = new URL(e.request.url);
   if (url.origin === location.origin) e.respondWith(app(e.request));
-  else if (url.hostname.endsWith("tile.openstreetmap.org")) e.respondWith(tile(e.request));
+  else if (url.hostname.endsWith("tile.openstreetmap.org") || url.hostname === "server.arcgisonline.com") e.respondWith(tile(e.request));
 });
