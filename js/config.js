@@ -1,0 +1,48 @@
+// Ρυθμίσεις που δεν αλλάζει ο χρήστης: διακομιστές και όρια της πλοήγησης.
+
+export const SERVERS = {
+  route: [
+    "https://router.project-osrm.org/route/v1/driving/",
+    "https://routing.openstreetmap.de/routed-car/route/v1/driving/",
+  ],
+  photon: "https://photon.komoot.io/api/",
+  nominatim: "https://nominatim.openstreetmap.org/search",
+  overpass: [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+  ],
+  tiles: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+};
+
+export const NAV = {
+  OFF_ROUTE_M: 60,        // πόσο μακριά από τη γραμμή = εκτός διαδρομής
+  OFF_ROUTE_FIXES: 3,     // πόσες συνεχόμενες θέσεις εκτός πριν ξαναϋπολογίσει
+  PASSED_M: 8,            // πόσο μετά τη στροφή θεωρείται «περασμένη»
+  BACKTRACK_M: 60,        // μόνο αν γυρίσεις πίσω τόσο, ξαναγυρίζει σε προηγούμενη στροφή
+  ARRIVE_M: 25,
+  IDLE_S: 90,
+  GPS_LOST_MS: 10000,
+  REROUTE_RETRY_MS: 5000,
+};
+
+export const SEARCH = {
+  NEAR_BOX: 0.6,          // μοίρες (~65 χλμ) γύρω σου: εκεί ψάχνουμε πρώτα
+};
+
+export const DEFAULT_VIEW = { lat: 37.9838, lng: 23.7275, zoom: 13 };
+
+// Κατηγορίες για τις ατάκες και τις δικές σου ηχογραφήσεις.
+export const QUIP_CATEGORIES = {
+  start: "Ξεκίνημα",
+  left: "Αριστερά",
+  right: "Δεξιά",
+  straight: "Ευθεία",
+  uturn: "Αναστροφή",
+  roundabout: "Κυκλικός κόμβος",
+  highway: "Εθνική / ράμπες",
+  recalc: "Λάθος δρόμος",
+  speeding: "Τρέχεις",
+  idle: "Ακινησία",
+  arrive: "Άφιξη",
+};

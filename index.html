@@ -13,12 +13,12 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
   <div id="map"></div>
 
-  <!-- αναζήτηση -->
+  <!-- πάνω: αναζήτηση -->
   <div id="top">
     <form id="search" class="card">
       <svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
@@ -32,10 +32,10 @@
     <ul id="results" class="card list"></ul>
   </div>
 
-  <!-- κάρτα οδηγίας (στην πλοήγηση) -->
+  <!-- πλοήγηση: κάρτα οδηγίας -->
   <div id="banner" class="card" hidden>
     <div class="maneuver"><svg id="arrow" viewBox="0 0 48 48"></svg></div>
-    <div class="banner-text">
+    <div>
       <div id="dist"></div>
       <div id="instr"></div>
     </div>
@@ -89,7 +89,7 @@
       <button id="go" class="pill primary wide">Ξεκίνα</button>
     </div>
 
-    <!-- κάτω μπάρα πλοήγησης -->
+    <!-- πλοήγηση: κάτω μπάρα -->
     <div id="navbar" class="card" hidden>
       <div class="trip">
         <div><b id="eta-min">–</b><span>λεπτά</span></div>
@@ -104,7 +104,7 @@
     </div>
   </div>
 
-  <!-- επιλογές για ένα αποθηκευμένο μέρος -->
+  <!-- φύλλο επιλογών (⋯, οδηγίες τοποθεσίας) -->
   <div id="actions" class="sheet-wrap" hidden>
     <div class="sheet small">
       <h3 id="actions-title"></h3>
@@ -135,7 +135,7 @@
       <section>
         <h3>Φωνή</h3>
         <label>Φωνή ανάγνωσης
-          <select id="s-voice"></select>
+          <select id="s-voice"><option value="">Αυτόματα (ελληνική)</option></select>
         </label>
         <p class="hint" id="voice-hint">Για καλύτερη ελληνική φωνή στο iPhone: Ρυθμίσεις → Προσβασιμότητα → Εκφώνηση περιεχομένου → Φωνές → Ελληνικά, και κατέβασε μια «Βελτιωμένη».</p>
         <label>Ταχύτητα <output id="o-rate"></output>
@@ -204,11 +204,6 @@
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/NoSleep.min.js"></script>
-  <script src="net.js"></script>
-  <script src="phrases.js"></script>
-  <script src="recordings.js"></script>
-  <script src="places.js"></script>
-  <script src="poi.js"></script>
-  <script src="app.js"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
