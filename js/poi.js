@@ -15,6 +15,10 @@ const MAX_AGE = 3 * 24 * 3600e3;   // ανανέωση κάθε 3 μέρες
 const RETRY_AFTER = 60e3;          // μετά από αποτυχία, ξαναδοκιμή σε 1 λεπτό
 const MAX_AREAS = 5;
 const PER_CAT = 150;               // πόσα κρατάμε ανά κατηγορία και περιοχή
+const SHOW_NEAR = 8000;            // όσο κατεβαίνει η περιοχή σου, μόνο μέρη μέσα σε αυτή την απόσταση
+const SHOW_MAX = 25000;            // ποτέ δεν δείχνουμε μέρη πιο μακριά από αυτό (μέτρα)…
+const SHOW_MAX_WIDE = 60000;       // …εκτός αν ψάξαμε επίτηδες πιο μακριά (εξοχή)
+const FORGET_DIST = 150000;        // περιοχές πιο μακριά από εκεί που είσαι τώρα ξεχνιούνται
 
 // key: [όνομα, εικονίδιο, φίλτρα Overpass, έλεγχος ετικετών, λέξη για Nominatim]
 export const CATS = {
@@ -99,7 +103,8 @@ function trim(items, pos) {
 
 function addArea(kind, pos, items, replaceNearby = false) {
   const area = { kind, lat: pos.lat, lng: pos.lng, ts: Date.now(), items: trim(items, pos) };
-  const others = replaceNearby ? areas.filter((a) => !near(a, pos)) : areas;
+  // ξεχνάμε τις περιοχές που είναι πολύ μακριά από εκεί που είσαι τώρα
+  const others = areas.filter((a) => d(a, pos) < FORGET_DIST && !(replaceNearby && near(a, pos)));
   areas = [area, ...others].slice(0, MAX_AREAS * 3);
   save();
 }
@@ -170,14 +175,25 @@ function unique(rows) {
 const toPlace = (it, pos) => ({ cat: it[0], lat: it[1], lng: it[2], name: it[3], sub: it[4], dist: haversine([pos.lat, pos.lng], [it[1], it[2]]) });
 
 // Άμεσα, από τη μνήμη του κινητού, πιο κοντινά πρώτα.
-export function nearby(cat, pos, limit = 25) {
-  const rows = unique(areas.flatMap((a) => a.items.filter((it) => it[0] === cat)));
-  return rows.map((it) => toPlace(it, pos)).sort((a, b) => a.dist - b.dist).slice(0, limit);
+// Μόνο μέρη που είναι πραγματικά κοντά σου τώρα — όχι από περιοχές που πέρασες παλιότερα.
+// strict: η περιοχή σου δεν έχει κατέβει ακόμα, οπότε μόνο τα πολύ κοντινά.
+export function nearby(cat, pos, { limit = 25, strict = false } = {}) {
+  const max = strict ? SHOW_NEAR : searchedWide(cat, pos) ? SHOW_MAX_WIDE : SHOW_MAX;
+  const rows = unique(areas.filter((a) => d(a, pos) < max + 45000).flatMap((a) => a.items.filter((it) => it[0] === cat)));
+  return rows
+    .map((it) => toPlace(it, pos))
+    .filter((p) => p.dist <= max)
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, limit);
 }
 
 // Για τις προτάσεις όσο γράφεις: μέρη με όνομα που ταιριάζει.
 export function findByName(norm, pos, limit = 5) {
   if (!norm) return [];
-  const rows = unique(areas.flatMap((a) => a.items.filter((it) => normalize(it[3]).includes(norm))));
-  return rows.map((it) => toPlace(it, pos)).sort((a, b) => a.dist - b.dist).slice(0, limit);
+  const rows = unique(areas.filter((a) => d(a, pos) < SHOW_MAX + 45000).flatMap((a) => a.items.filter((it) => normalize(it[3]).includes(norm))));
+  return rows
+    .map((it) => toPlace(it, pos))
+    .filter((p) => p.dist <= SHOW_MAX)
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, limit);
 }

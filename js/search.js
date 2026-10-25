@@ -11,6 +11,7 @@ import { getJSON } from "./net.js";
 import * as POI from "./poi.js";
 import { previewDestination } from "./preview.js";
 import { showNearby } from "./nearby.js";
+import { freshPosition } from "./gps.js";
 
 // ---------- διακομιστές ----------
 
@@ -209,6 +210,7 @@ $("search").addEventListener("submit", async (e) => {
   const intent = nearbyIntent(q);
   if (intent?.strong) return openNearby(intent.key);
 
+  await freshPosition(30000, 5000); // ψάχνουμε γύρω από το πού είσαι τώρα
   const from = origin();
   const header = `Αποτελέσματα για «${q}»`;
   const local = localMatches(q, from);

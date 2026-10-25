@@ -13,7 +13,31 @@ export const onPosition = (fn) => (handler = fn);
 
 // Κάθε θέση περνάει από εδώ (GPS, προσομοίωση, τεστ). Ένα λάθος δεν σταματάει τίποτα.
 export function feed(pos) {
+  state.lastFix = Date.now();
   safe(() => handler(pos));
+}
+
+// Θέση που ξέρουμε ότι είναι τωρινή: αν η τελευταία είναι παλιά (ή δεν έχει έρθει ακόμα,
+// π.χ. μόλις άνοιξες την εφαρμογή), ζητάμε καινούργια από το GPS πριν ψάξουμε.
+export function freshPosition(maxAge = 30000, timeout = 8000) {
+  if (state.pos && (state.simTimer || Date.now() - state.lastFix < maxAge)) return Promise.resolve(state.pos);
+  if (!("geolocation" in navigator) || state.gpsDenied) return Promise.resolve(state.pos);
+  return new Promise((resolve) => {
+    const done = () => resolve(state.pos);
+    const timer = setTimeout(done, timeout + 500);
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        clearTimeout(timer);
+        onFix(p);
+        done();
+      },
+      () => {
+        clearTimeout(timer);
+        done();
+      },
+      { enableHighAccuracy: true, timeout, maximumAge: 5000 }
+    );
+  });
 }
 
 let watchId = null;
@@ -39,7 +63,6 @@ function onFix(p) {
     }
   }
   prevFix = { lat, lng, t: now };
-  state.lastFix = now;
   if (state.gpsLost) {
     state.gpsLost = false;
     setStatus("");
