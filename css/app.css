@@ -41,6 +41,8 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
 /* ---------- χάρτης ---------- */
 
 #map { position: fixed; inset: 0; z-index: 0; background: #dfe3e8; }
+.leaflet-container { direction: ltr; } /* ο χάρτης μένει ίδιος και στα Αραβικά */
+#arrow, #then-arrow, #steps-list svg { direction: ltr; }
 .leaflet-control-attribution { font-size: 10px; }
 .leaflet-bottom { display: none; } /* η αναφορά OSM μπαίνει πάνω, κάτω από την αναζήτηση */
 .leaflet-top.leaflet-right { top: calc(var(--safe-top) + 64px); }
@@ -153,12 +155,12 @@ body.navigating #top { display: none; }
 #go { margin: 10px 12px 0; width: auto; }
 
 /* κάρτες διαδρομών */
-.list li.route { flex-direction: column; align-items: stretch; gap: 4px; border-left: 4px solid transparent; }
-.list li.route.sel { border-left-color: var(--blue); background: rgba(61, 139, 253, .1); }
+.list li.route { flex-direction: column; align-items: stretch; gap: 4px; border-inline-start: 4px solid transparent; }
+.list li.route.sel { border-inline-start-color: var(--blue); background: rgba(61, 139, 253, .1); }
 .route .line1 { display: flex; align-items: baseline; gap: 10px; }
 .route .time { font-size: 20px; font-weight: 800; }
 .route .dist { font-size: 15px; color: var(--muted); }
-.route .tag { margin-left: auto; font-size: 12px; font-weight: 700; color: #4ade80; }
+.route .tag { margin-inline-start: auto; font-size: 12px; font-weight: 700; color: #4ade80; }
 .route .tag.slow { color: var(--muted); }
 .route .via { font-size: 14px; opacity: .9; }
 .route .flags { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -214,13 +216,13 @@ body.navigating #top { display: none; }
 .sheet select { display: block; width: 100%; margin-top: 6px; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); font-size: 16px; background: var(--card-2); }
 .sheet input[type=range] { display: block; width: 100%; margin-top: 8px; accent-color: var(--accent); }
 .sheet input[type=checkbox] { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
-.sheet output { float: right; color: var(--muted); }
+.sheet output { float: inline-end; color: var(--muted); }
 .hint { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
 
 .sheet.small { padding-top: 16px; }
 .sheet.small h3 { margin: 0 0 12px; font-size: 16px; font-weight: 600; text-align: center; color: var(--muted); }
-.sheet.small p { margin: 0 0 8px; font-size: 15px; line-height: 1.5; text-align: left; color: var(--text); }
-#actions-buttons .pill { display: block; width: 100%; margin-top: 8px; padding: 14px 18px; text-align: left; font-size: 16px; }
+.sheet.small p { margin: 0 0 8px; font-size: 15px; line-height: 1.5; text-align: start; color: var(--text); }
+#actions-buttons .pill { display: block; width: 100%; margin-top: 8px; padding: 14px 18px; text-align: start; font-size: 16px; }
 
 .rec-buttons { display: flex; gap: 8px; margin-top: 12px; }
 .rec-buttons .pill { flex: 1; margin: 0; text-align: center; }

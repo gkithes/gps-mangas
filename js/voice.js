@@ -6,7 +6,7 @@
 
 import { PHRASES } from "./phrases.js";
 import { WORLD_PHRASES } from "./phrases-world.js";
-import { t, lang, locale } from "./i18n.js";
+import { t, lang, locale, isNormalGps } from "./i18n.js";
 import { settings } from "./store.js";
 import { recordingsFor } from "./recordings.js";
 
@@ -197,7 +197,7 @@ function pick(category) {
 // Λέει την ατάκα της κατηγορίας (στο «σοβαρό» μόνο την κανονική οδηγία).
 // Επιστρέφει το κείμενο για την κάρτα.
 export function quip(category, plainText, interrupt = true) {
-  if (settings.mode === "plain") {
+  if (isNormalGps()) {
     if (plainText) speak(plainText, interrupt);
     return "";
   }

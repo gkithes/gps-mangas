@@ -124,23 +124,24 @@ const NEAR_WORDS = new RegExp(
     "\\b(in der nahe|in meiner nahe|nachste|nachster|in der umgebung)\\b",
     "\\b(vicino a me|qui vicino|nelle vicinanze|piu vicino)\\b",
     "\\b(perto de mim|aqui perto|mais proximo|perto)\\b",
+    "قريب مني|قريبه مني|قريب|قريبه|حدي|جنبي|بالقرب|الاقرب",
   ].join("|"),
   "g"
 );
 const INTENTS = {
-  fuel: ["gas", "fuel", "petrol", "βενζιν", "πρατηρι", "καυσιμ", "πετρελαι", "gasolin", "essence", "carburant", "station service", "tankstell", "benzin", "distributore", "posto de", "combustivel", "bomba de"],
-  food: ["restaurant", "food", "eat", "pizza", "burger", "diner", "εστιατορ", "ταβερν", "φαγητ", "φαι", "σουβλακ", "πιτσ", "ψησταρι", "restaurante", "comida", "comer", "manger", "essen", "ristorante", "mangiare", "trattoria", "pizzeria"],
-  cafe: ["cafe", "coffee", "καφε", "καφετερ", "cafeteria", "kaffee", "caffe", "bar cafe", "pastelaria"],
-  market: ["supermarket", "grocery", "market", "σουπερ", "μαρκετ", "παντοπωλ", "supermercado", "supermarche", "epicerie", "supermarkt", "supermercato", "alimentari", "mercearia"],
-  pharmacy: ["pharmacy", "drugstore", "φαρμακ", "farmacia", "pharmacie", "apotheke"],
-  parking: ["parking", "παρκιν", "σταθμευσ", "aparcamiento", "estacionamiento", "parkplatz", "parkhaus", "parcheggio", "estacionamento"],
-  atm: ["atm", "bank", "αταμ", "τραπεζ", "cajero", "banco", "banque", "distributeur", "geldautomat", "bancomat", "multibanco"],
-  ev: ["charging", "charger", "φορτισ", "carga electrica", "recharge", "borne", "ladestation", "ladesaule", "ricarica", "colonnina", "carregamento"],
-  hotel: ["hotel", "motel", "ξενοδοχ", "albergo", "hostal", "pousada"],
-  hospital: ["hospital", "clinic", "urgent care", "νοσοκομ", "κλινικ", "urgencias", "hopital", "urgences", "krankenhaus", "notaufnahme", "ospedale", "pronto soccorso", "urgencia"],
-  carwash: ["car wash", "πλυντηρ", "lavado", "lavage auto", "waschanlage", "autowasche", "autolavaggio", "lavagem"],
-  repair: ["mechanic", "repair", "tire", "tyre", "συνεργ", "βουλκαν", "λαστιχ", "taller", "mecanico", "garage", "werkstatt", "reifen", "officina", "gommista", "oficina", "pneus"],
-  wc: ["toilet", "restroom", "bathroom", "τουαλετ", "bano", "aseo", "toilettes", "toilette", "wc", "bagno", "casa de banho", "banheiro"],
+  fuel: ["بنزين", "محطه", "gas", "fuel", "petrol", "βενζιν", "πρατηρι", "καυσιμ", "πετρελαι", "gasolin", "essence", "carburant", "station service", "tankstell", "benzin", "distributore", "posto de", "combustivel", "bomba de"],
+  food: ["مطعم", "اكل", "اكله", "مناقيش", "شاورما", "restaurant", "food", "eat", "pizza", "burger", "diner", "εστιατορ", "ταβερν", "φαγητ", "φαι", "σουβλακ", "πιτσ", "ψησταρι", "restaurante", "comida", "comer", "manger", "essen", "ristorante", "mangiare", "trattoria", "pizzeria"],
+  cafe: ["قهوه", "كافيه", "كافي", "cafe", "coffee", "καφε", "καφετερ", "cafeteria", "kaffee", "caffe", "bar cafe", "pastelaria"],
+  market: ["سوبرماركت", "سوبر ماركت", "دكان", "ميني ماركت", "supermarket", "grocery", "market", "σουπερ", "μαρκετ", "παντοπωλ", "supermercado", "supermarche", "epicerie", "supermarkt", "supermercato", "alimentari", "mercearia"],
+  pharmacy: ["صيدليه", "pharmacy", "drugstore", "φαρμακ", "farmacia", "pharmacie", "apotheke"],
+  parking: ["باركينغ", "موقف", "parking", "παρκιν", "σταθμευσ", "aparcamiento", "estacionamiento", "parkplatz", "parkhaus", "parcheggio", "estacionamento"],
+  atm: ["صراف", "بنك", "atm", "bank", "αταμ", "τραπεζ", "cajero", "banco", "banque", "distributeur", "geldautomat", "bancomat", "multibanco"],
+  ev: ["شحن", "charging", "charger", "φορτισ", "carga electrica", "recharge", "borne", "ladestation", "ladesaule", "ricarica", "colonnina", "carregamento"],
+  hotel: ["اوتيل", "فندق", "hotel", "motel", "ξενοδοχ", "albergo", "hostal", "pousada"],
+  hospital: ["مستشفي", "طواري", "hospital", "clinic", "urgent care", "νοσοκομ", "κλινικ", "urgencias", "hopital", "urgences", "krankenhaus", "notaufnahme", "ospedale", "pronto soccorso", "urgencia"],
+  carwash: ["غسيل", "car wash", "πλυντηρ", "lavado", "lavage auto", "waschanlage", "autowasche", "autolavaggio", "lavagem"],
+  repair: ["ميكانيك", "كاراج", "دواليب", "mechanic", "repair", "tire", "tyre", "συνεργ", "βουλκαν", "λαστιχ", "taller", "mecanico", "garage", "werkstatt", "reifen", "officina", "gommista", "oficina", "pneus"],
+  wc: ["حمام", "تواليت", "toilet", "restroom", "bathroom", "τουαλετ", "bano", "aseo", "toilettes", "toilette", "wc", "bagno", "casa de banho", "banheiro"],
 };
 
 // { key, strong }: strong = σίγουρα ζητάει «κοντά μου» («βενζίνη», «gas near me») → το «Πάμε» ανοίγει τη λίστα.
@@ -152,8 +153,9 @@ export function nearbyIntent(q) {
   if (!rest) return null;
   const words = rest.split(" ").length;
   if (!asked && words > 2) return null;
+  const bare = rest.replace(/(^|\s)ال/g, "$1"); // Αραβικά: «البنزين» = «بنزين»
   for (const [key, stems] of Object.entries(INTENTS)) {
-    if (stems.some((st) => rest.startsWith(st) || rest.includes(" " + st))) return { key, strong: asked || words === 1 };
+    if (stems.some((st) => [rest, bare].some((r) => r.startsWith(st) || r.includes(" " + st)))) return { key, strong: asked || words === 1 };
   }
   return null;
 }

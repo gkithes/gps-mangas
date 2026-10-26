@@ -20,7 +20,16 @@ export const distTo = (from, p) => haversine([from.lat, from.lng], [p.lat, p.lng
 
 // Για συγκρίσεις κειμένου: χωρίς τόνους, μικρά, τελικό ς = σ.
 export function normalize(s) {
-  return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/ς/g, "σ");
+  return String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/ς/g, "σ")
+    // Αραβικά: χωρίς φωνήεντα/τατουίλ, ενιαίο άλεφ, ة→ه, ى→ي
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي");
 }
 
 export const lowerFirst = (s) => s.charAt(0).toLowerCase() + s.slice(1);

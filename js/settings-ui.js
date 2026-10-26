@@ -64,6 +64,15 @@ bind("s-uilang", "uiLang", {
   },
 });
 
+// Στυλ: «Κανονικό GPS» = καμία ατάκα (φωνή ή οθόνη) και ευγενικά κείμενα — ξαναφόρτωση για να αλλάξουν όλα.
+bind("s-style", "style", {
+  onChange: () => {
+    if (settings.style === "magkas" && settings.mode === "plain") settings.mode = "both";
+    saveSettings();
+    location.reload();
+  },
+});
+
 const showSpeed = bind("s-speed", "speedLimit", { output: "o-speed", parse: Number, format: speedLabel });
 bind("s-units", "units", {
   onChange: () => {

@@ -8,7 +8,8 @@ import { loadJSON, saveJSON } from "./util.js";
 const SETTINGS_KEY = "gps-mangas-settings";
 
 export const DEFAULTS = {
-  uiLang: "el",     // γλώσσα εφαρμογής: el | en | es | fr | de | it | pt | auto
+  uiLang: "el",     // γλώσσα εφαρμογής: el | en | es | fr | de | it | pt | ar | auto
+  style: "magkas",  // magkas (με ατάκες) | normal (κανονικό GPS, χωρίς ατάκες)
   units: "auto",    // auto | km | mi
   mapStyle: "map",  // map | satellite
   travel: "drive",  // drive | walk

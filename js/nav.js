@@ -9,7 +9,7 @@ import { spokenDist, shortDist, clockIn } from "./format.js";
 import { fetchRoutes, locate, instruction, quipCategory, arrowSvg } from "./route.js";
 import { speak, quip, stopSound } from "./voice.js";
 import { feed } from "./gps.js";
-import { t } from "./i18n.js";
+import { t, isNormalGps } from "./i18n.js";
 
 // ---------- εμφάνιση ----------
 
@@ -162,7 +162,7 @@ export function guide(pos) {
     state.stillSince ||= now;
     if (now - state.stillSince > NAV.IDLE_S * 1000 && now - state.lastIdleWarn > 120000) {
       state.lastIdleWarn = now;
-      if (settings.mode !== "plain") quip("idle", "", false);
+      if (!isNormalGps()) quip("idle", "", false);
     }
   } else {
     state.stillSince = null;

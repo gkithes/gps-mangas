@@ -42,7 +42,7 @@ export function duration(secs) {
 }
 
 export function clockIn(secs) {
-  return new Date(Date.now() + secs * 1000).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
+  return new Date(Date.now() + secs * 1000).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit", numberingSystem: "latn" });
 }
 
 export const speedLabel = (kmh) => (useMiles() ? `${Math.round(kmh * 0.621)} mph` : `${kmh} ${t("u.kmh")}`);

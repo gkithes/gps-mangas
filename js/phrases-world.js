@@ -9,6 +9,7 @@ export const WORLD_PHRASES = {
     de: ["Na los, anschnallen und keinen Mist bauen.", "Auf geht's. Wenn wir uns verfahren, bist du schuld, nicht ich.", "Gib Gas, Kumpel, das ist kein Sonntagsausflug."],
     it: ["Dai, allaccia la cintura e non fare casini.", "Si parte. Se ci perdiamo, è colpa tua, non mia.", "Dai gas, capo, non è una passeggiata della domenica."],
     pt: ["Vá, põe o cinto e não faças asneira.", "Bora. Se nos perdermos, a culpa é tua, não minha.", "Acelera, pá, isto não é um passeio de domingo."],
+    ar: ["يلا، شدّ الحزام وما تعمل شي غلط.", "منمشي. إذا ضعنا، الحق عليك مش عليّ.", "دعّس عالبنزين، مش مشوار أحد هيدا."],
   },
   left: {
     en: ["Left, genius. The OTHER left.", "Hang a left, you knucklehead!", "Turn left. You do know which one's left, right?"],
@@ -17,6 +18,7 @@ export const WORLD_PHRASES = {
     de: ["Links, du Genie. Das ANDERE Links.", "Links abbiegen, du Pfeife!", "Links. Du weißt doch, wo links ist, oder?"],
     it: ["A sinistra, genio. L'ALTRA sinistra.", "Gira a sinistra, testone!", "Sinistra. Lo sai qual è la sinistra, vero?"],
     pt: ["À esquerda, génio. A OUTRA esquerda.", "Vira à esquerda, cabeça de alho chocho!", "Esquerda. Sabes qual é a esquerda, não sabes?"],
+    ar: ["شمال يا عبقري. الشمال التاني!", "لفّ شمال يا راس اليابس!", "شمال. بتعرف وين الشمال، صح؟"],
   },
   right: {
     en: ["Right, right, RIGHT! Wake up!", "Turn right, and use your blinker for once.", "Right turn. Yeah, by the guy staring at you."],
@@ -25,6 +27,7 @@ export const WORLD_PHRASES = {
     de: ["Rechts, rechts, RECHTS! Aufwachen!", "Rechts abbiegen, und setz ausnahmsweise mal den Blinker.", "Rechts. Ja, da wo der Typ dich so blöd anguckt."],
     it: ["Destra, destra, DESTRA! Svegliati!", "Gira a destra, e metti la freccia per una volta.", "A destra. Sì, dove quello ti guarda storto."],
     pt: ["Direita, direita, DIREITA! Acorda!", "Vira à direita, e liga o pisca por uma vez.", "À direita. Sim, onde está o tipo a olhar-te torto."],
+    ar: ["يمين، يمين، يمين! فيق!", "لفّ يمين، وحطّ الفلاشر لمرّة بحياتك.", "يمين. إيه، عند الزلمة يلّي عم يطلّع فيك."],
   },
   straight: {
     en: ["Keep going straight. Tough, I know.", "Straight ahead, and stop checking yourself in the mirror."],
@@ -33,6 +36,7 @@ export const WORLD_PHRASES = {
     de: ["Geradeaus weiter. Schwer, ich weiß.", "Immer geradeaus, und hör auf, in den Spiegel zu glotzen."],
     it: ["Vai dritto. Difficile, lo so.", "Sempre dritto, e smettila di guardarti nello specchietto."],
     pt: ["Segue em frente. Difícil, eu sei.", "Sempre em frente, e pára de te ver ao espelho."],
+    ar: ["كمّل دغري. صعبة، بعرف.", "دغري، وبطّل تتطلّع بالمراية."],
   },
   uturn: {
     en: ["Make a U-turn. Yep, you blew it again.", "Turn around, Columbus, you discovered the wrong continent."],
@@ -41,6 +45,7 @@ export const WORLD_PHRASES = {
     de: ["Bitte wenden. Ja, du hast es wieder verbockt.", "Umdrehen, Kolumbus, falscher Kontinent."],
     it: ["Fai inversione. Sì, l'hai fatta grossa di nuovo.", "Torna indietro, Colombo, hai scoperto il continente sbagliato."],
     pt: ["Faz inversão. Pois, voltaste a fazer asneira.", "Dá a volta, Colombo, descobriste o continente errado."],
+    ar: ["لفّ لفّة كاملة. إيه، خربطتها مرّة تانية.", "رجاع يا كولومبوس، اكتشفت القارة الغلط."],
   },
   roundabout: {
     en: ["Roundabout. Don't do ten laps like a lost puppy.", "Into the roundabout. The guys already in it have priority, not you, Einstein."],
@@ -49,6 +54,7 @@ export const WORLD_PHRASES = {
     de: ["Kreisverkehr. Dreh nicht zehn Runden wie ein verirrter Hund.", "Rein in den Kreisel. Vorfahrt haben die drin, nicht du, Einstein."],
     it: ["Rotonda. Non fare dieci giri come un cane smarrito.", "Entra nella rotonda. La precedenza ce l'hanno quelli dentro, non tu, Einstein."],
     pt: ["Rotunda. Não dês dez voltas como um cão perdido.", "Entra na rotunda. A prioridade é de quem lá está, não tua, ó génio."],
+    ar: ["دوّار. ما تلفّ عشر مرّات متل الضايع.", "فوت عالدوّار. الأفضلية للّي جوّا، مش إلك يا فهمان."],
   },
   highway: {
     en: ["Get on the highway. And not at 25, grandpa.", "Exit coming. Miss it and the next one's in another state."],
@@ -57,6 +63,7 @@ export const WORLD_PHRASES = {
     de: ["Auf die Autobahn. Und nicht mit 40, Opa.", "Ausfahrt. Wenn du die verpasst, kommt die nächste im Nachbarland."],
     it: ["Entra in autostrada. E non a 40, nonno.", "Uscita. Se la perdi, la prossima è in un'altra regione."],
     pt: ["Entra na autoestrada. E não a 40, avô.", "Saída. Se a falhares, a próxima é noutro distrito."],
+    ar: ["طلاع عالأوتوستراد. ومش عالأربعين يا جدّو.", "في مخرج. إذا فوّتو، الجاي بزحلة."],
   },
   recalc: {
     en: ["Recalculating… just like your life choices.", "Again? Who gave you a license, a cereal box?", "Nice going, genius. Recalculating.", "Lost? Should've called a cab."],
@@ -65,6 +72,7 @@ export const WORLD_PHRASES = {
     de: ["Neuberechnung… genau wie deine Lebensentscheidungen.", "Schon wieder? Wer hat dir den Führerschein gegeben, ein Kaugummiautomat?", "Toll gemacht, Genie. Ich rechne neu."],
     it: ["Ricalcolo… come le tue scelte di vita.", "Ancora? Chi ti ha dato la patente, le patatine?", "Bravo, genio. Ricalcolo."],
     pt: ["A recalcular… tal como as tuas escolhas de vida.", "Outra vez? Quem te deu a carta, a farinha Amparo?", "Muito bem, génio. A recalcular."],
+    ar: ["عم احسب من جديد… متل قراراتك بالحياة.", "كمان مرّة؟ مين عطاك الدفتر، الدكّنجي؟", "برافو يا عبقري. عم احسب من جديد.", "ضعت؟ كان أخدت تاكسي."],
   },
   speeding: {
     en: ["Easy there, Schumacher, your mother-in-law isn't chasing you.", "Slow down, the ticket goes in your mom's name.", "Is this a car or a plane?"],
@@ -73,6 +81,7 @@ export const WORLD_PHRASES = {
     de: ["Langsam, Schumacher, deine Schwiegermutter jagt dich nicht.", "Bremsen, der Strafzettel geht an deine Mutter.", "Ist das ein Auto oder ein Flugzeug?"],
     it: ["Piano, Schumacher, non ti sta inseguendo tua suocera.", "Rallenta, la multa arriva a tua madre.", "Questa è una macchina o un aereo?"],
     pt: ["Calma, Schumacher, a tua sogra não te persegue.", "Abranda, que a multa vai para a tua mãe.", "Isto é um carro ou um avião?"],
+    ar: ["على مهلك يا شوماخر، ما حماتك لاحقتك.", "خفّف، المخالفة رح توصل عإسم إمّك.", "هيدي سيارة ولّا طيارة؟"],
   },
   idle: {
     en: ["What happened? Stopped for a donut?", "Move it! You're stuck like gum on a shoe."],
@@ -81,6 +90,7 @@ export const WORLD_PHRASES = {
     de: ["Was ist los? Currywurst-Pause?", "Beweg dich! Du klebst fest wie Kaugummi am Schuh."],
     it: ["Che succede? Ti sei fermato per un caffè?", "Muoviti! Sei incollato come una gomma sotto la scarpa."],
     pt: ["Então? Paraste para um pastel de nata?", "Mexe-te! Estás colado como pastilha no sapato."],
+    ar: ["شو صار؟ وقفت تاكل منقوشة؟", "تحرّك! لازق متل العلكة بالصبّاط."],
   },
   arrive: {
     en: ["We made it. Alive, somehow.", "You're here. And nobody died, miracle.", "Destination. Park it, and not on the sidewalk, please."],
@@ -89,5 +99,6 @@ export const WORLD_PHRASES = {
     de: ["Angekommen. Lebend, wie durch ein Wunder.", "Du bist da. Und keiner ist gestorben, Wahnsinn.", "Ziel. Park ein, und bitte nicht auf dem Gehweg."],
     it: ["Arrivati. Vivi, per miracolo.", "Sei arrivato. E nessuno è morto, miracolo.", "Destinazione. Parcheggia, e non sul marciapiede, per favore."],
     pt: ["Chegámos. Vivos, por milagre.", "Estás cá. E ninguém morreu, um milagre.", "Destino. Estaciona, e não no passeio, por favor."],
+    ar: ["وصلنا. عايشين، بأعجوبة.", "وصلت. وما حدا مات، معجزة.", "وصلنا. صفّ، وما تصفّ عالرصيف دخلك."],
   },
 };
