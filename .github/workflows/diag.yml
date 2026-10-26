@@ -3,6 +3,7 @@ on: push
 jobs:
   probe:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - name: Probe Overpass servers with the app's exact queries
@@ -11,13 +12,16 @@ jobs:
           const qs = require("./.diag/qs.json");
           const servers = ["https://overpass-api.de/api/interpreter","https://overpass.private.coffee/api/interpreter","https://overpass.kumi.systems/api/interpreter"];
           (async () => {
-            for (const s of servers) for (const [i, q] of qs.entries()) {
+            await Promise.all(servers.flatMap(s => qs.map(async (q, i) => {
               const t = Date.now();
               try {
-                const r = await fetch(s, { method: "POST", body: new URLSearchParams({ data: q }), headers: { Origin: "https://gkithes.github.io", "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1" } });
+                const r = await fetch(s, { signal: AbortSignal.timeout(30000), method: "POST", body: new URLSearchParams({ data: q }), headers: { Origin: "https://gkithes.github.io", "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1" } });
                 const txt = await r.text();
                 let n = "-"; try { const j = JSON.parse(txt); n = j.elements.length + " elements; remark=" + (j.remark || ""); } catch {}
                 console.log(`${s} q${i} HTTP ${r.status} ${Date.now()-t}ms ACAO=${r.headers.get("access-control-allow-origin")} ctype=${r.headers.get("content-type")} ${n} :: ${txt.slice(0, 200).replace(/\s+/g," ")}`);
-              } catch (e) { console.log(`${s} q${i} ERROR ${Date.now()-t}ms ${e.cause?.code || e.message}`); }
+              } catch (e) { console.log(`${s} q${i} ERROR ${Date.now()-t}ms ${e.name} ${e.cause?.code || e.message}`); }
+            })));
+            for (const u of ["https://nominatim.openstreetmap.org/search?q=cafe&format=jsonv2&limit=40&bounded=1&viewbox=-71.6348,42.1229,-71.3948,41.8829", "https://nominatim.openstreetmap.org/search?q=Cumberland+Farms&format=jsonv2&limit=40&bounded=1&viewbox=-71.6348,42.1229,-71.3948,41.8829", "https://photon.komoot.io/api/?q=cafe&lat=42.0029&lon=-71.5148&limit=20&osm_tag=amenity:cafe"]) {
+              try { const r = await fetch(u, { signal: AbortSignal.timeout(20000), headers: { Referer: "https://gkithes.github.io/gps-mangas/" } }); const j = await r.json(); const arr = j.features || j; console.log(u.slice(0, 60), r.status, arr.length, arr.slice(0, 5).map(x => (x.name || x.properties?.name) + "/" + (x.type || x.properties?.osm_value)).join(", ")); } catch (e) { console.log(u.slice(0,60), "ERR", e.message); }
             }
           })();'
