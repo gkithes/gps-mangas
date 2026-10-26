@@ -1,0 +1,4 @@
+[
+ "[out:json][timeout:25][bbox:41.97595,-71.55107,42.02985,-71.47853];(nwr[\"amenity\"=\"cafe\"];nwr[\"shop\"=\"coffee\"];nwr[\"amenity\"=\"fast_food\"];nwr[\"amenity\"=\"fuel\"];nwr[\"shop\"=\"convenience\"];);out center 400;",
+ "[out:json][timeout:25][bbox:41.95798,-71.57524,42.04782,-71.45436];(nwr[\"amenity\"=\"fuel\"];nwr[\"amenity\"~\"^(restaurant|fast_food)$\"];nwr[\"amenity\"=\"cafe\"];nwr[\"shop\"=\"coffee\"];nwr[\"amenity\"=\"fast_food\"];nwr[\"amenity\"=\"fuel\"];nwr[\"shop\"=\"convenience\"];nwr[\"shop\"~\"^(supermarket|convenience)$\"];nwr[\"amenity\"=\"pharmacy\"];nwr[\"amenity\"~\"^(atm|bank)$\"];nwr[\"amenity\"=\"charging_station\"];nwr[\"tourism\"~\"^(hotel|motel|guest_house)$\"];nwr[\"amenity\"~\"^(hospital|clinic)$\"];nwr[\"amenity\"=\"car_wash\"];nwr[\"shop\"~\"^(car_repair|tyres)$\"];);out center ;"
+]

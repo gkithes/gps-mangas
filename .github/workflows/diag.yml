@@ -1,0 +1,23 @@
+name: diag-overpass
+on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe Overpass servers with the app's exact queries
+        run: |
+          node -e '
+          const qs = require("./.diag/qs.json");
+          const servers = ["https://overpass-api.de/api/interpreter","https://overpass.private.coffee/api/interpreter","https://overpass.kumi.systems/api/interpreter"];
+          (async () => {
+            for (const s of servers) for (const [i, q] of qs.entries()) {
+              const t = Date.now();
+              try {
+                const r = await fetch(s, { method: "POST", body: new URLSearchParams({ data: q }), headers: { Origin: "https://gkithes.github.io", "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1" } });
+                const txt = await r.text();
+                let n = "-"; try { const j = JSON.parse(txt); n = j.elements.length + " elements; remark=" + (j.remark || ""); } catch {}
+                console.log(`${s} q${i} HTTP ${r.status} ${Date.now()-t}ms ACAO=${r.headers.get("access-control-allow-origin")} ctype=${r.headers.get("content-type")} ${n} :: ${txt.slice(0, 200).replace(/\s+/g," ")}`);
+              } catch (e) { console.log(`${s} q${i} ERROR ${Date.now()-t}ms ${e.cause?.code || e.message}`); }
+            }
+          })();'
