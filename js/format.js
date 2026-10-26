@@ -14,13 +14,18 @@ export function useMiles() {
   return /^(en-(US|LR|GB)|my)/i.test(navigator.language || "");
 }
 
-// Για τη φωνή: «350 μέτρα», «1,2 χιλιόμετρα», «0.3 miles».
+// Για τη φωνή: «350 μέτρα», «1,2 χιλιόμετρα», «2 χιλιόμετρα», «1 μίλι».
+function spokenBig(x, one, many) {
+  const r = Math.round(x * 10) / 10;
+  if (r === 1) return t(one);
+  return `${Number.isInteger(r) ? r : num(r)} ${t(many)}`;
+}
 export function spokenDist(m) {
   if (useMiles()) {
     if (m < 160) return `${Math.round((m * 3.281) / 50) * 50} ${t("u.ft")}`;
-    return `${num(m / 1609.34)} ${t("u.mi")}`;
+    return spokenBig(m / 1609.34, "u.mi1", "u.mi");
   }
-  if (m >= 1000) return `${num(m / 1000)} ${t("u.km")}`;
+  if (m >= 1000) return spokenBig(m / 1000, "u.km1", "u.km");
   return `${Math.round(m / 10) * 10} ${t("u.m")}`;
 }
 

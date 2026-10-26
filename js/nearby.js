@@ -1,7 +1,7 @@
 // Η κάτω μπάρα «κοντά μου»: βενζίνη, φαγητό, καφές…
 // Δείχνει αμέσως ό,τι υπάρχει στο κινητό και συμπληρώνει από το ίντερνετ στο παρασκήνιο.
 
-import { $ } from "./util.js";
+import { $, haversine } from "./util.js";
 import { state, origin } from "./state.js";
 import { map, layers, setMode, placeRow, listMessage, fitPadding } from "./ui.js";
 import { shortDist } from "./format.js";
@@ -52,6 +52,13 @@ function render(key, items, loading) {
   map.fitBounds(bounds, fitPadding());
 }
 
+// Αν η λίστα είναι ανοιχτή και μετακινηθείς πάνω από ~250 μ, ξαναβγαίνει από τη νέα θέση.
+let shown = null; // { key, lat, lng }
+export function nearbyFollow(pos) {
+  if (state.mode !== "places" || !shown || state.navigating) return;
+  if (haversine([shown.lat, shown.lng], [pos.lat, pos.lng]) > 250) showNearby(shown.key);
+}
+
 export async function showNearby(key) {
   const icon = POI.CATS[key][1];
   const label = POI.catLabel(key);
@@ -71,6 +78,7 @@ export async function showNearby(key) {
   }
   const from = origin();
   if (!from) return listMessage($("places-list"), t("near.noLocation"));
+  shown = { key, lat: from.lat, lng: from.lng };
 
   // 1) αμέσως ό,τι υπάρχει στο κινητό (αν η περιοχή δεν έχει κατέβει, μόνο τα πολύ κοντινά)
   const fresh = POI.isFresh(from);

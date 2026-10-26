@@ -10,6 +10,7 @@ import * as POI from "./poi.js";
 import { guide } from "./nav.js";
 import { onPosition, feed, startGps, renderLocate } from "./gps.js";
 import { renderDrawer } from "./drawer.js";
+import { nearbyFollow } from "./nearby.js";
 import "./preview.js";
 import "./nearby.js";
 import "./search.js";
@@ -38,7 +39,12 @@ onPosition((pos) => {
   }
   lastPos.update(pos);
   if (state.navigating) guide(pos);
-  else POI.refresh(pos).catch(() => {}); // κοντινά μέρη στο παρασκήνιο, για να είναι έτοιμα
+  else {
+    POI.refresh(pos).catch(() => {}); // κοντινά μέρη στο παρασκήνιο, για να είναι έτοιμα
+    nearbyFollow(pos);
+    // στην αρχική, ο χάρτης ακολουθεί τη θέση σου (εκτός αν τον μετακίνησες με το δάχτυλο)
+    if (!first && state.mode === "home" && state.follow) map.panTo([pos.lat, pos.lng], { animate: true });
+  }
 });
 
 applyStatic(); // κείμενα της σελίδας στη γλώσσα της εφαρμογής

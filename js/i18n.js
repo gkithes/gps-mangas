@@ -129,7 +129,7 @@ const TEXT = {
     "mod.sharp left": "απότομα αριστερά", "mod.sharp right": "απότομα δεξιά", "mod.straight": "ευθεία", "mod.uturn": "αναστροφή",
 
     "u.m": "μέτρα", "u.km": "χιλιόμετρα", "u.ft": "πόδια", "u.mi": "μίλια", "u.mShort": "μ", "u.kmShort": "χλμ",
-    "u.min": "λεπ.", "u.h": "ώρ.", "u.kmh": "χλμ/ώρα", "sat.credit": "Εικόνες &copy; Esri",
+    "u.km1": "1 χιλιόμετρο", "u.mi1": "1 μίλι", "u.min": "λεπ.", "u.h": "ώρ.", "u.kmh": "χλμ/ώρα", "sat.credit": "Εικόνες &copy; Esri",
     "travel.drive": "Αυτοκίνητο", "travel.walk": "Με τα πόδια", "set.clearPoi": "🧹 Καθάρισμα αποθηκευμένων κοντινών μερών", "poi.cleared": "Καθαρίστηκαν — θα κατέβουν ξανά για εκεί που είσαι", "search.fromLink": "Από σύνδεσμο χάρτη",
     "set.style": "Στυλ", "style.magkas": "😎 Μάγκας (με ατάκες)", "style.normal": "🧭 Κανονικό GPS (χωρίς ατάκες)", "search.ph.plain": "Αναζήτηση προορισμού", "search.none.plain": "Δεν βρέθηκε «{q}».", "near.none.plain": "Δεν βρέθηκαν μέρη κοντά σου.", "route.none.plain": "Δεν βρέθηκε διαδρομή.", "say.bye.plain": "Η πλοήγηση τελείωσε.", "install.title": "Για πλήρη οθόνη, χωρίς τη μπάρα του Safari", "install.steps": "Πάτα Κοινοποίηση ⬆︎ → Προσθήκη στην αρχική οθόνη (με το «Άνοιγμα ως εφαρμογή Ιστού» ανοιχτό) και άνοιγε την εφαρμογή από το εικονίδιο.", "search.shortLink": "Ο σύντομος σύνδεσμος δεν ανοίγει από εδώ. Στο Apple Maps πάτα το μέρος → Κοινοποίηση → Αντιγραφή, ή γράψε το όνομα/τη διεύθυνση.",
   },
@@ -217,7 +217,7 @@ const TEXT = {
     "mod.sharp left": "sharp left", "mod.sharp right": "sharp right", "mod.straight": "straight", "mod.uturn": "U-turn",
 
     "u.m": "meters", "u.km": "kilometers", "u.ft": "feet", "u.mi": "miles", "u.mShort": "m", "u.kmShort": "km",
-    "u.min": "min", "u.h": "h", "u.kmh": "km/h", "sat.credit": "Imagery &copy; Esri",
+    "u.km1": "1 kilometer", "u.mi1": "1 mile", "u.min": "min", "u.h": "h", "u.kmh": "km/h", "sat.credit": "Imagery &copy; Esri",
     "travel.drive": "Car", "travel.walk": "Walking", "set.clearPoi": "🧹 Clear saved nearby places", "poi.cleared": "Cleared — they'll download again for where you are", "search.fromLink": "From map link",
     "set.style": "Style", "style.magkas": "😎 Wise guy (with wisecracks)", "style.normal": "🧭 Normal GPS (no wisecracks)", "search.ph.plain": "Search for a destination", "search.none.plain": "No results for “{q}”.", "near.none.plain": "No places found nearby.", "route.none.plain": "No route found.", "say.bye.plain": "Navigation ended.", "install.title": "For full screen, without Safari's bar", "install.steps": "Tap Share ⬆︎ → Add to Home Screen (with “Open as Web App” on) and open the app from its icon.", "search.shortLink": "That short link can't be opened from here. In Apple Maps tap the place → Share → Copy, or type the name/address.",
   },
@@ -306,7 +306,7 @@ const TEXT = {
     "mod.straight": "recto", "mod.uturn": "en sentido contrario",
 
     "u.m": "metros", "u.km": "kilómetros", "u.ft": "pies", "u.mi": "millas", "u.mShort": "m", "u.kmShort": "km",
-    "u.min": "min", "u.h": "h", "u.kmh": "km/h", "sat.credit": "Imágenes &copy; Esri",
+    "u.min": "min", "u.h": "h", "u.kmh": "km/h", "u.km1": "1 kilómetro", "u.mi1": "1 milla", "sat.credit": "Imágenes &copy; Esri",
     "travel.drive": "Coche", "travel.walk": "A pie", "set.clearPoi": "🧹 Borrar lugares cercanos guardados", "poi.cleared": "Borrado — se descargarán de nuevo para donde estás", "search.fromLink": "Desde enlace de mapa",
     "set.style": "Estilo", "style.magkas": "😎 Vacilón (con chistes)", "style.normal": "🧭 GPS normal (sin chistes)", "search.ph.plain": "Buscar destino", "search.none.plain": "No hay resultados para «{q}».", "near.none.plain": "No se encontraron lugares cerca.", "route.none.plain": "No se encontró ruta.", "say.bye.plain": "Navegación finalizada.", "install.title": "Para pantalla completa, sin la barra de Safari", "install.steps": "Toca Compartir ⬆︎ → Añadir a pantalla de inicio (con «Abrir como app web» activado) y abre la app desde su icono.", "search.shortLink": "Ese enlace corto no se puede abrir desde aquí. En Apple Maps toca el lugar → Compartir → Copiar, o escribe el nombre/la dirección.",
   },
@@ -394,7 +394,7 @@ const TEXT = {
     "mod.sharp left": "franchement à gauche", "mod.sharp right": "franchement à droite", "mod.straight": "tout droit", "mod.uturn": "en demi-tour",
 
     "u.m": "mètres", "u.km": "kilomètres", "u.ft": "pieds", "u.mi": "miles", "u.mShort": "m", "u.kmShort": "km",
-    "u.min": "min", "u.h": "h", "u.kmh": "km/h", "sat.credit": "Images &copy; Esri",
+    "u.min": "min", "u.h": "h", "u.kmh": "km/h", "u.km1": "1 kilomètre", "u.mi1": "1 mile", "sat.credit": "Images &copy; Esri",
     "travel.drive": "Voiture", "travel.walk": "À pied", "set.clearPoi": "🧹 Effacer les lieux proches enregistrés", "poi.cleared": "Effacé — ils seront retéléchargés pour l'endroit où tu es", "search.fromLink": "Depuis un lien de carte",
     "set.style": "Style", "style.magkas": "😎 Chambreur (avec vannes)", "style.normal": "🧭 GPS normal (sans vannes)", "search.ph.plain": "Rechercher une destination", "search.none.plain": "Aucun résultat pour « {q} ».", "near.none.plain": "Aucun lieu trouvé à proximité.", "route.none.plain": "Aucun itinéraire trouvé.", "say.bye.plain": "Navigation terminée.", "install.title": "Pour le plein écran, sans la barre de Safari", "install.steps": "Touche Partager ⬆︎ → Sur l'écran d'accueil (avec « Ouvrir comme app web » activé) et ouvre l'app depuis son icône.", "search.shortLink": "Ce lien court ne s'ouvre pas d'ici. Dans Plans, touche le lieu → Partager → Copier, ou tape le nom/l'adresse.",
   },
@@ -482,7 +482,7 @@ const TEXT = {
     "mod.sharp left": "scharf links", "mod.sharp right": "scharf rechts", "mod.straight": "geradeaus", "mod.uturn": "wenden",
 
     "u.m": "Metern", "u.km": "Kilometern", "u.ft": "Fuß", "u.mi": "Meilen", "u.mShort": "m", "u.kmShort": "km",
-    "u.min": "Min.", "u.h": "Std.", "u.kmh": "km/h", "sat.credit": "Bilder &copy; Esri",
+    "u.min": "Min.", "u.h": "Std.", "u.kmh": "km/h", "u.km1": "1 Kilometer", "u.mi1": "1 Meile", "sat.credit": "Bilder &copy; Esri",
     "travel.drive": "Auto", "travel.walk": "Zu Fuß", "set.clearPoi": "🧹 Gespeicherte Orte in der Nähe löschen", "poi.cleared": "Gelöscht — sie werden für deinen Standort neu geladen", "search.fromLink": "Aus Kartenlink",
     "set.style": "Stil", "style.magkas": "😎 Großmaul (mit Sprüchen)", "style.normal": "🧭 Normales Navi (ohne Sprüche)", "search.ph.plain": "Ziel suchen", "search.none.plain": "Keine Ergebnisse für „{q}“.", "near.none.plain": "Keine Orte in der Nähe gefunden.", "route.none.plain": "Keine Route gefunden.", "say.bye.plain": "Navigation beendet.", "install.title": "Für Vollbild, ohne die Safari-Leiste", "install.steps": "Tippe auf Teilen ⬆︎ → Zum Home-Bildschirm (mit „Als Web-App öffnen“ an) und öffne die App über ihr Symbol.", "search.shortLink": "Dieser Kurzlink lässt sich hier nicht öffnen. In Apple Karten auf den Ort tippen → Teilen → Kopieren, oder Name/Adresse eingeben.",
   },
@@ -570,7 +570,7 @@ const TEXT = {
     "mod.sharp left": "decisamente a sinistra", "mod.sharp right": "decisamente a destra", "mod.straight": "dritto", "mod.uturn": "in inversione",
 
     "u.m": "metri", "u.km": "chilometri", "u.ft": "piedi", "u.mi": "miglia", "u.mShort": "m", "u.kmShort": "km",
-    "u.min": "min", "u.h": "h", "u.kmh": "km/h", "sat.credit": "Immagini &copy; Esri",
+    "u.min": "min", "u.h": "h", "u.kmh": "km/h", "u.km1": "1 chilometro", "u.mi1": "1 miglio", "sat.credit": "Immagini &copy; Esri",
     "travel.drive": "Auto", "travel.walk": "A piedi", "set.clearPoi": "🧹 Cancella i luoghi vicini salvati", "poi.cleared": "Cancellati — verranno riscaricati per dove sei", "search.fromLink": "Da link della mappa",
     "set.style": "Stile", "style.magkas": "😎 Sbruffone (con battute)", "style.normal": "🧭 GPS normale (senza battute)", "search.ph.plain": "Cerca una destinazione", "search.none.plain": "Nessun risultato per «{q}».", "near.none.plain": "Nessun luogo trovato nelle vicinanze.", "route.none.plain": "Nessun percorso trovato.", "say.bye.plain": "Navigazione terminata.", "install.title": "Per lo schermo intero, senza la barra di Safari", "install.steps": "Tocca Condividi ⬆︎ → Aggiungi alla schermata Home (con «Apri come app web» attivo) e apri l'app dalla sua icona.", "search.shortLink": "Questo link breve non si apre da qui. In Mappe tocca il luogo → Condividi → Copia, oppure scrivi il nome/l'indirizzo.",
   },
@@ -658,7 +658,7 @@ const TEXT = {
     "mod.sharp left": "acentuadamente à esquerda", "mod.sharp right": "acentuadamente à direita", "mod.straight": "em frente", "mod.uturn": "em inversão",
 
     "u.m": "metros", "u.km": "quilómetros", "u.ft": "pés", "u.mi": "milhas", "u.mShort": "m", "u.kmShort": "km",
-    "u.min": "min", "u.h": "h", "u.kmh": "km/h", "sat.credit": "Imagens &copy; Esri",
+    "u.min": "min", "u.h": "h", "u.kmh": "km/h", "u.km1": "1 quilómetro", "u.mi1": "1 milha", "sat.credit": "Imagens &copy; Esri",
     "travel.drive": "Carro", "travel.walk": "A pé", "set.clearPoi": "🧹 Limpar locais próximos guardados", "poi.cleared": "Limpo — vão ser descarregados de novo para onde estás", "search.fromLink": "De ligação de mapa",
     "set.style": "Estilo", "style.magkas": "😎 Gozão (com piadas)", "style.normal": "🧭 GPS normal (sem piadas)", "search.ph.plain": "Procurar destino", "search.none.plain": "Sem resultados para «{q}».", "near.none.plain": "Não foram encontrados locais perto.", "route.none.plain": "Não foi encontrado percurso.", "say.bye.plain": "Navegação terminada.", "install.title": "Para ecrã inteiro, sem a barra do Safari", "install.steps": "Toca em Partilhar ⬆︎ → Adicionar ao ecrã principal (com «Abrir como app web» ligado) e abre a app pelo ícone.", "search.shortLink": "Esta ligação curta não abre daqui. No Mapas toca no local → Partilhar → Copiar, ou escreve o nome/a morada.",
   },
@@ -856,7 +856,7 @@ const TEXT = {
     "u.min": "د",
     "u.h": "س",
     "u.kmh": "كم/س",
-    "sat.credit": "الصور &copy; Esri",
+    "u.km1": "كيلومتر واحد", "u.mi1": "ميل واحد", "sat.credit": "الصور &copy; Esri",
     "travel.drive": "سيارة",
     "travel.walk": "مشي",
     "set.clearPoi": "🧹 امحي المحلات القريبة المحفوظة",

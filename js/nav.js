@@ -217,27 +217,33 @@ export function guide(pos) {
     return;
   }
 
-  // πόσο νωρίς ειδοποιεί: στην εθνική νωρίτερα
-  // πεζός: «σε 60 μέτρα…», «εδώ στρίψε»
+  // Προειδοποιήσεις πριν από κάθε στροφή, σε απόσταση η μία από την άλλη:
+  //   πόλη 800 μ → 300 μ → στη στροφή · εθνική 2 χλμ → 1 χλμ → 400 μ → στη στροφή · πεζός 150 μ → 50 μ → στη στροφή
   const v = pos.speed != null && pos.speed > (walking ? 0.3 : 1) ? pos.speed : walking ? 1.4 : 13;
-  const farDist = walking ? 80 : Math.min(800, Math.max(200, v * 15));
+  const highway = !walking && v > 17; // πάνω από ~60 χλμ/ώρα
+  const warnAt = walking ? NAV.WARN_WALK : highway ? NAV.WARN_HIGHWAY : NAV.WARN_CITY;
   const nearDist = walking ? 20 : Math.min(120, Math.max(40, v * 3.5));
   const a = state.announced;
+  const say = (dist) => {
+    if (settings.mode === "quips") return;
+    const ds = spokenDist(dist > 200 ? Math.round(dist / 50) * 50 : dist);
+    speak(step.type === "arrive" ? t("say.arriveIn", { d: ds }) : t("say.inDist", { d: ds, instr: lowerFirst(instr) }));
+  };
 
   // μόλις φανεί νέα στροφή μακριά: «Συνέχισε για 2 χλμ και μετά…» — για να ξέρεις ότι σε ακούει
   if (!a.intro) {
     a.intro = true;
-    if (d > farDist + 150 && settings.mode !== "quips") {
+    if (d > warnAt[0] + 150 && settings.mode !== "quips") {
       const then = step.type === "arrive" ? t("say.arriveThen") : lowerFirst(instr);
       speak(t("say.continueThen", { d: spokenDist(d), then }));
     }
   }
 
-  if (!a.far && d <= farDist && d > nearDist) {
-    a.far = true;
-    if (settings.mode !== "quips") {
-      speak(step.type === "arrive" ? t("say.arriveIn", { d: spokenDist(d) }) : t("say.inDist", { d: spokenDist(d), instr: lowerFirst(instr) }));
-    }
+  // η πιο κοντινή προειδοποίηση που πέρασες (αν το GPS «πηδήξει», δεν λέει δύο μαζί)
+  const due = warnAt.filter((w) => d <= w && d > nearDist && !a[`w${w}`]).pop();
+  if (due) {
+    warnAt.filter((w) => w >= due).forEach((w) => (a[`w${w}`] = true));
+    say(d);
   }
 
   if (!a.near && d <= nearDist && step.type !== "arrive") {

@@ -21,6 +21,15 @@ const SHOW_MAX = 25000;            // ποτέ δεν δείχνουμε μέρ�
 const SHOW_MAX_WIDE = 60000;       // …εκτός αν ψάξαμε επίτηδες πιο μακριά (εξοχή)
 const FORGET_DIST = 150000;        // περιοχές πιο μακριά από εκεί που είσαι τώρα ξεχνιούνται
 
+// Καφέ = και τα «fast food» που είναι καφές/ντόνατς (Dunkin', Starbucks, Tim Hortons…):
+// στον χάρτη τα περισσότερα είναι καταχωρημένα ως fast food, όχι ως café.
+const COFFEE_BRANDS = /dunkin|starbucks|tim hortons|peet'?s|caribou|costa|gregorys|dutch bros|coffee|caf[eé]|espresso|donut|doughnut/i;
+function isCoffee(t) {
+  if (t.amenity === "cafe" || t.shop === "coffee") return true;
+  if (t.amenity !== "fast_food") return false;
+  return /coffee|donut|doughnut/i.test(t.cuisine || "") || COFFEE_BRANDS.test(t.brand || t.name || "");
+}
+
 // Όνομα κατηγορίας στη γλώσσα της εφαρμογής.
 export const catLabel = (cat) => t(`cat.${cat}`);
 
@@ -28,7 +37,7 @@ export const catLabel = (cat) => t(`cat.${cat}`);
 export const CATS = {
   fuel: ["Βενζίνη", "⛽", ['["amenity"="fuel"]'], (t) => t.amenity === "fuel", "fuel"],
   food: ["Φαγητό", "🍽", ['["amenity"~"^(restaurant|fast_food)$"]'], (t) => /^(restaurant|fast_food)$/.test(t.amenity), "restaurant"],
-  cafe: ["Καφές", "☕", ['["amenity"="cafe"]'], (t) => t.amenity === "cafe", "cafe"],
+  cafe: ["Καφές", "☕", ['["amenity"="cafe"]', '["shop"="coffee"]', '["amenity"="fast_food"]["cuisine"~"coffee|donut",i]', '["amenity"="fast_food"]["brand"~"dunkin|starbucks|tim hortons|peet|caribou|costa|gregorys|dutch bros",i]'], isCoffee, "cafe"],
   market: ["Σούπερ μάρκετ", "🛒", ['["shop"~"^(supermarket|convenience)$"]'], (t) => /^(supermarket|convenience)$/.test(t.shop), "supermarket"],
   pharmacy: ["Φαρμακείο", "💊", ['["amenity"="pharmacy"]'], (t) => t.amenity === "pharmacy", "pharmacy"],
   parking: ["Πάρκινγκ", "🅿️", ['["amenity"="parking"]["access"!~"^(private|no|customers)$"]'], (t) => t.amenity === "parking", "parking"],
@@ -43,7 +52,7 @@ export const CATS = {
 
 // Κάθε περιοχή: { lat, lng, ts, kind: "full" | "wide:<cat>" | "quick", items: [[cat, lat, lng, name, sub]] }
 // Αλλάζει όταν πρέπει να σβηστούν τα παλιά αποθηκευμένα (π.χ. μετά από διόρθωση).
-const DATA_VERSION = 2;
+const DATA_VERSION = 3; // 3: ο καφές περιλαμβάνει Dunkin'/Starbucks — ξανακατέβασμα
 let areas = loadJSON(KEY, []).map((a) => ({ kind: a.kind || (a.partial ? (a.partial === "quick" ? "quick" : `wide:${a.partial}`) : "full"), ...a }));
 if (loadJSON(`${KEY}-version`, 0) !== DATA_VERSION) {
   areas = [];
@@ -97,10 +106,11 @@ async function overpass(cats, pos, half) {
     const lng = el.lon ?? el.center?.lon;
     const tags = el.tags || {};
     if (lat == null) continue;
-    const cat = cats.find((c) => CATS[c][3](tags));
-    if (!cat) continue;
-    const name = tags.name || tags.brand || catLabel(cat);
-    items.push([cat, +lat.toFixed(6), +lng.toFixed(6), name, describe(tags, name)]);
+    // ένα μέρος μπορεί να ανήκει σε πολλές κατηγορίες (π.χ. Dunkin' = καφές ΚΑΙ φαγητό)
+    for (const cat of cats.filter((c) => CATS[c][3](tags))) {
+      const name = tags.name || tags.brand || catLabel(cat);
+      items.push([cat, +lat.toFixed(6), +lng.toFixed(6), name, describe(tags, name)]);
+    }
   }
   return items;
 }
@@ -157,10 +167,16 @@ export async function quick(cat, pos) {
     q: CATS[cat][4], format: "jsonv2", limit: "40", bounded: "1",
     viewbox: [pos.lng - deg, pos.lat + deg, pos.lng + deg, pos.lat - deg].map((x) => x.toFixed(4)).join(","),
   });
-  const data = await getJSON(`${SERVERS.nominatim}?${params}`, {}, 8000);
+  let data = await getJSON(`${SERVERS.nominatim}?${params}`, {}, 8000);
+  if (cat === "cafe") {
+    params.set("q", "coffee");
+    try {
+      data = [...(data || []), ...((await getJSON(`${SERVERS.nominatim}?${params}`, {}, 8000)) || [])];
+    } catch {}
+  }
   const items = [];
   for (const r of data || []) {
-    if (!CATS[cat][3]({ [r.category]: r.type })) continue;
+    if (!CATS[cat][3]({ [r.category]: r.type, name: r.name })) continue;
     const name = r.name || catLabel(cat);
     const sub = (r.display_name || "").split(",").map((x) => x.trim()).filter((x) => x && x !== name).slice(0, 2).join(", ");
     items.push([cat, +(+r.lat).toFixed(6), +(+r.lon).toFixed(6), name, sub]);

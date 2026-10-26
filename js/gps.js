@@ -44,9 +44,18 @@ export function freshPosition(maxAge = 30000, timeout = 8000) {
 let watchId = null;
 let prevFix = null;
 
+// Ζητάει θέση τώρα (το iPhone, όταν στέκεσαι, στέλνει ενημερώσεις αραιά).
+let lastPoll = 0;
+export function pollPosition() {
+  if (!("geolocation" in navigator) || state.gpsDenied || state.simTimer) return;
+  lastPoll = Date.now();
+  navigator.geolocation.getCurrentPosition(onFix, () => {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 3000 });
+}
+
 export function startGps() {
   if (!("geolocation" in navigator)) return;
   state.lastGpsRestart = Date.now();
+  pollPosition(); // αμέσως μια θέση, χωρίς να περιμένουμε την παρακολούθηση
   if (watchId != null) navigator.geolocation.clearWatch(watchId);
   watchId = navigator.geolocation.watchPosition(onFix, onGpsError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
 }
@@ -123,6 +132,9 @@ function watchdog() {
   const now = Date.now();
   renderLocate();
   if (state.simTimer) return;
+
+  // θέση παλιότερη από 15″ (π.χ. στέκεσαι); ζήτα καινούργια
+  if (now - state.lastFix > 15000 && now - lastPoll > 15000) pollPosition();
 
   // GPS σιωπηλό; επανεκκίνηση
   const silent = now - state.lastFix > NAV.GPS_LOST_MS;

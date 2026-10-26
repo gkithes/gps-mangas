@@ -47,6 +47,8 @@ export const layers = {
   route: L.layerGroup().addTo(map),
   poi: L.layerGroup().addTo(map),
   user: L.circleMarker([0, 0], { radius: 9, color: "#fff", weight: 3, fillColor: "#2a7de1", fillOpacity: 1 }),
+  // κύκλος ακρίβειας: πόσο σίγουρο είναι το GPS για το πού είσαι
+  accuracy: L.circle([0, 0], { radius: 1, color: "#2a7de1", weight: 1, opacity: 0.35, fillColor: "#2a7de1", fillOpacity: 0.12, interactive: false }),
   dest: null,
 };
 
@@ -64,7 +66,10 @@ export function setDestMarker(p) {
 
 export function showUser(pos) {
   layers.user.setLatLng([pos.lat, pos.lng]);
+  layers.accuracy.setLatLng([pos.lat, pos.lng]).setRadius(Math.min(pos.accuracy || 0, 500));
+  if (!map.hasLayer(layers.accuracy)) layers.accuracy.addTo(map);
   if (!map.hasLayer(layers.user)) layers.user.addTo(map);
+  layers.user.bringToFront();
 }
 
 // Περιθώρια ώστε ό,τι δείχνουμε να μην κρύβεται κάτω από την αναζήτηση ή τις κάρτες.
