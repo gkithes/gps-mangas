@@ -8,7 +8,7 @@ import { loadJSON, saveJSON } from "./util.js";
 const SETTINGS_KEY = "gps-mangas-settings";
 
 export const DEFAULTS = {
-  uiLang: "el",     // γλώσσα εφαρμογής: el | en | es | fr | de | it | pt | ar | auto
+  uiLang: "en",     // γλώσσα εφαρμογής: el | en | es | fr | de | it | pt | ar | auto
   style: "magkas",  // magkas (με ατάκες) | normal (κανονικό GPS, χωρίς ατάκες)
   units: "auto",    // auto | km | mi
   mapStyle: "map",  // map | satellite
@@ -18,7 +18,7 @@ export const DEFAULTS = {
   pitch: 1,
   volume: 1,
   mode: "both",     // both | quips | plain | mute
-  lang: "el",       // el | pnt | mix
+  lang: "en",       // γλώσσα ατάκων: en | el | pnt | mix | …
   chime: true,
   speedLimit: 120,  // πάντα σε χλμ/ώρα
   myAudio: "mix",   // mix | only | off
@@ -27,6 +27,11 @@ export const DEFAULTS = {
 };
 
 export const settings = { ...DEFAULTS, ...loadJSON(SETTINGS_KEY, {}) };
+// Μία φορά: όλοι ξεκινάνε ξανά στα Αγγλικά (αλλάζει από Ρυθμίσεις → Γενικά → Γλώσσα).
+if (settings.langReset !== 1) {
+  Object.assign(settings, { uiLang: "en", lang: "en", langReset: 1 });
+  saveJSON(SETTINGS_KEY, settings);
+}
 export const saveSettings = () => saveJSON(SETTINGS_KEY, settings);
 
 // ---------- τελευταία γνωστή θέση ----------
