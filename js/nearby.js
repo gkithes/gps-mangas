@@ -8,10 +8,12 @@ import { shortDist } from "./format.js";
 import * as POI from "./poi.js";
 import { previewDestination } from "./preview.js";
 import { freshPosition } from "./gps.js";
+import { t } from "./i18n.js";
 
 const chip = (key) => document.querySelector(`.chip[data-key="${key}"]`);
 
-for (const [key, [label, icon]] of Object.entries(POI.CATS)) {
+for (const [key, [, icon]] of Object.entries(POI.CATS)) {
+  const label = POI.catLabel(key);
   const b = document.createElement("button");
   b.className = "chip";
   b.dataset.key = key;
@@ -22,20 +24,21 @@ for (const [key, [label, icon]] of Object.entries(POI.CATS)) {
 $("places-close").onclick = () => setMode("home");
 
 function render(key, items, loading) {
-  const [label, icon] = POI.CATS[key];
+  const icon = POI.CATS[key][1];
+  const label = POI.catLabel(key);
   const list = $("places-list");
   const from = origin();
   list.innerHTML = "";
   layers.poi.clearLayers();
-  if (!state.pos) listMessage(list, "📍 Με βάση την τελευταία γνωστή θέση σου", "head");
+  if (!state.pos) listMessage(list, t("near.lastKnown"), "head");
   if (loading) {
     const li = document.createElement("li");
     li.className = "loading";
-    li.textContent = items.length ? "Ανανέωση…" : "Ψάχνω…";
+    li.textContent = items.length ? t("near.refreshing") : t("near.searching");
     list.appendChild(li);
   }
   if (!items.length) {
-    if (!loading) listMessage(list, "Τίποτα εδώ γύρω. Έρημος, ρε!");
+    if (!loading) listMessage(list, t("near.none"));
     return;
   }
   const pin = L.divIcon({ className: "poi-pin", html: `<div>${icon}</div>`, iconSize: [32, 32], iconAnchor: [16, 16] });
@@ -50,22 +53,23 @@ function render(key, items, loading) {
 }
 
 export async function showNearby(key) {
-  const [label, icon] = POI.CATS[key];
+  const icon = POI.CATS[key][1];
+  const label = POI.catLabel(key);
   const button = chip(key);
   setMode("places");
   button.classList.add("on");
   button.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
-  $("places-title").textContent = `${icon} ${label} κοντά σου`;
+  $("places-title").textContent = t("near.title", { icon, label });
 
   const stillHere = () => state.mode === "places" && button.classList.contains("on");
   // πρώτα πού είσαι ΤΩΡΑ (όχι πού ήσουν πριν από λίγα λεπτά)
   if (!state.pos || Date.now() - state.lastFix > 30000) {
-    listMessage($("places-list"), "Βρίσκω πού είσαι…", "loading");
+    listMessage($("places-list"), t("near.findingYou"), "loading");
     await freshPosition();
     if (!stillHere()) return;
   }
   const from = origin();
-  if (!from) return listMessage($("places-list"), "📍 Δεν ξέρω πού είσαι. Πάτα το κόκκινο κουμπί για να ενεργοποιήσεις την τοποθεσία.");
+  if (!from) return listMessage($("places-list"), t("near.noLocation"));
 
   // 1) αμέσως ό,τι υπάρχει στο κινητό (αν η περιοχή δεν έχει κατέβει, μόνο τα πολύ κοντινά)
   const fresh = POI.isFresh(from);
@@ -95,5 +99,5 @@ export async function showNearby(key) {
   if (!stillHere()) return;
   items = POI.nearby(key, from);
   if (items.length) render(key, items, false);
-  else listMessage($("places-list"), "Δεν βρήκα τίποτα ή δεν απαντάει ο χάρτης. Δοκίμασε ξανά σε λίγο.");
+  else listMessage($("places-list"), t("near.failed"));
 }

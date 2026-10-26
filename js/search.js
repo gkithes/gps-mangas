@@ -12,6 +12,7 @@ import * as POI from "./poi.js";
 import { previewDestination } from "./preview.js";
 import { showNearby } from "./nearby.js";
 import { freshPosition } from "./gps.js";
+import { t } from "./i18n.js";
 
 // ---------- διακομιστές ----------
 
@@ -27,7 +28,7 @@ function photonPlace(f) {
   const p = f.properties || {};
   const [lng, lat] = f.geometry.coordinates;
   const street = [p.street, p.housenumber].filter(Boolean).join(" ");
-  const name = p.name || street || p.city || "Σημείο";
+  const name = p.name || street || p.city || t("search.point");
   const sub = [p.name ? street : "", p.city || p.county, p.state, p.country].filter((x) => x && x !== name).join(", ");
   return { lat, lng, name, sub };
 }
@@ -68,21 +69,33 @@ async function nominatim(q, from, signal) {
 
 // ---------- «κοντά μου» ----------
 
-const NEAR_WORDS = /\b(near me|nearby|near by|around me|close to me|closest|nearest)\b|κοντα μου|κοντινο|κοντινα|κοντινοτερ|εδω γυρω|πλησιεστερ/g;
+// Λέξεις «κοντά μου» και κατηγορίες σε όλες τις γλώσσες της εφαρμογής (χωρίς τόνους, μικρά).
+const NEAR_WORDS = new RegExp(
+  [
+    "\\b(near me|nearby|near by|around me|close to me|closest|nearest)\\b",
+    "κοντα μου|κοντινο|κοντινα|κοντινοτερ|εδω γυρω|πλησιεστερ",
+    "\\b(cerca de mi|cerca|cercano|mas cercano)\\b",
+    "\\b(pres de moi|a proximite|le plus proche|autour de moi)\\b",
+    "\\b(in der nahe|in meiner nahe|nachste|nachster|in der umgebung)\\b",
+    "\\b(vicino a me|qui vicino|nelle vicinanze|piu vicino)\\b",
+    "\\b(perto de mim|aqui perto|mais proximo|perto)\\b",
+  ].join("|"),
+  "g"
+);
 const INTENTS = {
-  fuel: ["gas", "fuel", "petrol", "βενζιν", "πρατηρι", "καυσιμ", "πετρελαι"],
-  food: ["restaurant", "food", "eat", "pizza", "burger", "diner", "εστιατορ", "ταβερν", "φαγητ", "φαι", "σουβλακ", "πιτσ", "ψησταρι"],
-  cafe: ["cafe", "coffee", "καφε", "καφετερ"],
-  market: ["supermarket", "grocery", "market", "σουπερ", "μαρκετ", "παντοπωλ"],
-  pharmacy: ["pharmacy", "drugstore", "φαρμακ"],
-  parking: ["parking", "παρκιν", "σταθμευσ"],
-  atm: ["atm", "bank", "αταμ", "τραπεζ"],
-  ev: ["charging", "charger", "φορτισ"],
-  hotel: ["hotel", "motel", "ξενοδοχ"],
-  hospital: ["hospital", "clinic", "urgent care", "νοσοκομ", "κλινικ"],
-  carwash: ["car wash", "πλυντηρ"],
-  repair: ["mechanic", "repair", "tire", "tyre", "συνεργ", "βουλκαν", "λαστιχ"],
-  wc: ["toilet", "restroom", "bathroom", "τουαλετ"],
+  fuel: ["gas", "fuel", "petrol", "βενζιν", "πρατηρι", "καυσιμ", "πετρελαι", "gasolin", "essence", "carburant", "station service", "tankstell", "benzin", "distributore", "posto de", "combustivel", "bomba de"],
+  food: ["restaurant", "food", "eat", "pizza", "burger", "diner", "εστιατορ", "ταβερν", "φαγητ", "φαι", "σουβλακ", "πιτσ", "ψησταρι", "restaurante", "comida", "comer", "manger", "essen", "ristorante", "mangiare", "trattoria", "pizzeria"],
+  cafe: ["cafe", "coffee", "καφε", "καφετερ", "cafeteria", "kaffee", "caffe", "bar cafe", "pastelaria"],
+  market: ["supermarket", "grocery", "market", "σουπερ", "μαρκετ", "παντοπωλ", "supermercado", "supermarche", "epicerie", "supermarkt", "supermercato", "alimentari", "mercearia"],
+  pharmacy: ["pharmacy", "drugstore", "φαρμακ", "farmacia", "pharmacie", "apotheke"],
+  parking: ["parking", "παρκιν", "σταθμευσ", "aparcamiento", "estacionamiento", "parkplatz", "parkhaus", "parcheggio", "estacionamento"],
+  atm: ["atm", "bank", "αταμ", "τραπεζ", "cajero", "banco", "banque", "distributeur", "geldautomat", "bancomat", "multibanco"],
+  ev: ["charging", "charger", "φορτισ", "carga electrica", "recharge", "borne", "ladestation", "ladesaule", "ricarica", "colonnina", "carregamento"],
+  hotel: ["hotel", "motel", "ξενοδοχ", "albergo", "hostal", "pousada"],
+  hospital: ["hospital", "clinic", "urgent care", "νοσοκομ", "κλινικ", "urgencias", "hopital", "urgences", "krankenhaus", "notaufnahme", "ospedale", "pronto soccorso", "urgencia"],
+  carwash: ["car wash", "πλυντηρ", "lavado", "lavage auto", "waschanlage", "autowasche", "autolavaggio", "lavagem"],
+  repair: ["mechanic", "repair", "tire", "tyre", "συνεργ", "βουλκαν", "λαστιχ", "taller", "mecanico", "garage", "werkstatt", "reifen", "officina", "gommista", "oficina", "pneus"],
+  wc: ["toilet", "restroom", "bathroom", "τουαλετ", "bano", "aseo", "toilettes", "toilette", "wc", "bagno", "casa de banho", "banheiro"],
 };
 
 // { key, strong }: strong = σίγουρα ζητάει «κοντά μου» («βενζίνη», «gas near me») → το «Πάμε» ανοίγει τη λίστα.
@@ -130,13 +143,13 @@ function render(q, local, remote, { loading = false, header = "" } = {}) {
     li.textContent = text;
     list.appendChild(li);
   };
-  if (!from) head("📍 Δεν ξέρω πού είσαι — τα αποτελέσματα μπορεί να μην είναι κοντά σου");
+  if (!from) head(t("search.noLocation"));
   if (header) head(header);
 
   const intent = nearbyIntent(q);
   if (intent) {
-    const [label, icon] = POI.CATS[intent.key];
-    const li = placeRow(icon, `${label} κοντά σου`, "Όλα τα κοντινά, πιο κοντινά πρώτα", "");
+    const icon = POI.CATS[intent.key][1];
+    const li = placeRow(icon, t("near.title", { icon: "", label: POI.catLabel(intent.key) }).trim(), t("search.intentSub"), "");
     li.classList.add("intent");
     li.onclick = () => openNearby(intent.key);
     list.appendChild(li);
@@ -161,11 +174,11 @@ function render(q, local, remote, { loading = false, header = "" } = {}) {
   if (loading) {
     const li = document.createElement("li");
     li.className = "loading";
-    li.textContent = "Ψάχνω…";
+    li.textContent = t("near.searching");
     list.appendChild(li);
   } else if (!list.querySelector("li:not(.head)")) {
     list.innerHTML = "";
-    head(`Δεν βρήκα «${q}». Γράψ' το σωστά, ρε!`);
+    head(t("search.none", { q }));
   }
 }
 
@@ -212,7 +225,7 @@ $("search").addEventListener("submit", async (e) => {
 
   await freshPosition(30000, 5000); // ψάχνουμε γύρω από το πού είσαι τώρα
   const from = origin();
-  const header = `Αποτελέσματα για «${q}»`;
+  const header = t("search.results", { q });
   const local = localMatches(q, from);
   const have = last.q === q ? last.remote : []; // ό,τι βρήκαν ήδη οι προτάσεις, αμέσως
   render(q, local, have, { loading: true, header });

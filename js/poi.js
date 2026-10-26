@@ -7,6 +7,7 @@
 import { SERVERS } from "./config.js";
 import { getJSON } from "./net.js";
 import { haversine, loadJSON, saveJSON, normalize } from "./util.js";
+import { t } from "./i18n.js";
 
 const KEY = "gps-mangas-poi";
 const HALF = 5000;                 // μισό πλάτος του τετραγώνου κάθε περιοχής (μέτρα)
@@ -20,7 +21,10 @@ const SHOW_MAX = 25000;            // ποτέ δεν δείχνουμε μέρ�
 const SHOW_MAX_WIDE = 60000;       // …εκτός αν ψάξαμε επίτηδες πιο μακριά (εξοχή)
 const FORGET_DIST = 150000;        // περιοχές πιο μακριά από εκεί που είσαι τώρα ξεχνιούνται
 
-// key: [όνομα, εικονίδιο, φίλτρα Overpass, έλεγχος ετικετών, λέξη για Nominatim]
+// Όνομα κατηγορίας στη γλώσσα της εφαρμογής.
+export const catLabel = (cat) => t(`cat.${cat}`);
+
+// key: [όνομα (ελληνικό· στην οθόνη μπαίνει το catLabel), εικονίδιο, φίλτρα Overpass, έλεγχος ετικετών, λέξη για Nominatim]
 export const CATS = {
   fuel: ["Βενζίνη", "⛽", ['["amenity"="fuel"]'], (t) => t.amenity === "fuel", "fuel"],
   food: ["Φαγητό", "🍽", ['["amenity"~"^(restaurant|fast_food)$"]'], (t) => /^(restaurant|fast_food)$/.test(t.amenity), "restaurant"],
@@ -57,7 +61,7 @@ function describe(tags, name) {
   const bits = [];
   if (tags.brand && tags.brand !== name) bits.push(tags.brand);
   if (tags.cuisine) bits.push(tags.cuisine.split(";").slice(0, 2).join(", ").replace(/_/g, " "));
-  if (tags.opening_hours) bits.push(tags.opening_hours === "24/7" ? "Ανοιχτό 24ω" : tags.opening_hours);
+  if (tags.opening_hours) bits.push(tags.opening_hours === "24/7" ? t("poi.open24") : tags.opening_hours);
   const street = [tags["addr:street"], tags["addr:housenumber"]].filter(Boolean).join(" ");
   if (street) bits.push(street);
   return bits.join(" · ");
@@ -82,7 +86,7 @@ async function overpass(cats, pos, half) {
     if (lat == null) continue;
     const cat = cats.find((c) => CATS[c][3](tags));
     if (!cat) continue;
-    const name = tags.name || tags.brand || CATS[cat][0];
+    const name = tags.name || tags.brand || catLabel(cat);
     items.push([cat, +lat.toFixed(6), +lng.toFixed(6), name, describe(tags, name)]);
   }
   return items;
@@ -144,7 +148,7 @@ export async function quick(cat, pos) {
   const items = [];
   for (const r of data || []) {
     if (!CATS[cat][3]({ [r.category]: r.type })) continue;
-    const name = r.name || CATS[cat][0];
+    const name = r.name || catLabel(cat);
     const sub = (r.display_name || "").split(",").map((x) => x.trim()).filter((x) => x && x !== name).slice(0, 2).join(", ");
     items.push([cat, +(+r.lat).toFixed(6), +(+r.lon).toFixed(6), name, sub]);
   }

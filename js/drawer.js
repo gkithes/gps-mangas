@@ -6,6 +6,7 @@ import { state } from "./state.js";
 import { placeRow, openActions, toast, onModeChange } from "./ui.js";
 import { shortDist } from "./format.js";
 import { previewDestination } from "./preview.js";
+import { t } from "./i18n.js";
 
 export function renderDrawer() {
   const open = settings.drawerOpen;
@@ -21,7 +22,7 @@ export function renderDrawer() {
   if (!items.length) {
     const li = document.createElement("li");
     li.className = "empty";
-    li.textContent = list === "history" ? "Δεν έχεις πάει πουθενά ακόμα." : "Πάτα ⋯ σε έναν προορισμό ή ☆ στη διαδρομή για να μπει εδώ.";
+    li.textContent = list === "history" ? t("drawer.noHistory") : t("drawer.noFav");
     ul.appendChild(li);
     return;
   }
@@ -29,7 +30,7 @@ export function renderDrawer() {
     const li = placeRow(places.isFavorite(p) ? "★" : "🕘", p.name, p.sub, state.pos ? shortDist(distTo(state.pos, p)) : "");
     const more = document.createElement("button");
     more.className = "more";
-    more.setAttribute("aria-label", "Επιλογές");
+    more.setAttribute("aria-label", t("aria.more"));
     more.textContent = "⋯";
     more.onclick = (e) => {
       e.stopPropagation();
@@ -44,18 +45,18 @@ export function renderDrawer() {
 function options(list, p) {
   const fav = places.isFavorite(p);
   const buttons = [
-    { label: "🧭  Διαδρομές προς τα εκεί", fn: () => previewDestination(p) },
+    { label: t("act.routes"), fn: () => previewDestination(p) },
     {
-      label: fav ? "☆  Αφαίρεση από τα αγαπημένα" : "★  Προσθήκη στα αγαπημένα",
+      label: fav ? t("act.favRemove") : t("act.favAdd"),
       fn: () => {
-        toast(places.toggleFavorite(p) ? "Μπήκε στα αγαπημένα" : "Βγήκε από τα αγαπημένα");
+        toast(places.toggleFavorite(p) ? t("fav.added") : t("fav.removed"));
         renderDrawer();
       },
     },
     {
-      label: "✏️  Μετονομασία",
+      label: t("act.rename"),
       fn: () => {
-        const name = prompt("Νέο όνομα:", p.name)?.trim();
+        const name = prompt(t("act.renamePrompt"), p.name)?.trim();
         if (name) {
           places.rename(p.id, name);
           renderDrawer();
@@ -63,7 +64,7 @@ function options(list, p) {
       },
     },
     {
-      label: list === "history" ? "🗑  Διαγραφή από τα πρόσφατα" : "🗑  Διαγραφή από τα αγαπημένα",
+      label: list === "history" ? t("act.delHistory") : t("act.delFav"),
       danger: true,
       fn: () => {
         places.remove(list, p.id);
@@ -73,10 +74,10 @@ function options(list, p) {
   ];
   if (list === "history") {
     buttons.push({
-      label: "🧹  Καθάρισμα όλων των πρόσφατων",
+      label: t("act.clearHistory"),
       danger: true,
       fn: () => {
-        if (confirm("Να σβηστούν όλα τα πρόσφατα;")) {
+        if (confirm(t("act.clearConfirm"))) {
           places.clearHistory();
           renderDrawer();
         }

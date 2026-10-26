@@ -4,6 +4,7 @@ import { SERVERS, DEFAULT_VIEW } from "./config.js";
 import { $, escapeHtml } from "./util.js";
 import { lastPos, settings, saveSettings } from "./store.js";
 import { state } from "./state.js";
+import { t } from "./i18n.js";
 
 // ---------- χάρτης ----------
 
@@ -16,7 +17,7 @@ L.control.attribution({ position: "topright", prefix: false }).addTo(map);
 const BASE = {
   map: L.tileLayer(SERVERS.tiles, { maxZoom: 19, attribution: "&copy; OpenStreetMap" }),
   satellite: L.layerGroup([
-    L.tileLayer(SERVERS.satellite, { maxZoom: 19, maxNativeZoom: 18, attribution: "Εικόνες &copy; Esri" }),
+    L.tileLayer(SERVERS.satellite, { maxZoom: 19, maxNativeZoom: 18, attribution: t("sat.credit") }),
     L.tileLayer(SERVERS.satRoads, { maxZoom: 19, maxNativeZoom: 18 }),
     L.tileLayer(SERVERS.satLabels, { maxZoom: 19, maxNativeZoom: 18 }),
   ]),
@@ -32,13 +33,13 @@ export function setMapStyle(style) {
   saveSettings();
   // το κουμπί δείχνει σε τι θα αλλάξει
   $("map-style").textContent = style === "map" ? "🛰" : "🗺";
-  $("map-style").setAttribute("aria-label", style === "map" ? "Δορυφόρος" : "Χάρτης");
+  $("map-style").setAttribute("aria-label", style === "map" ? t("map.sat") : t("map.map"));
   $("s-mapstyle").value = style;
 }
 setMapStyle(settings.mapStyle);
 $("map-style").onclick = () => {
   setMapStyle(settings.mapStyle === "map" ? "satellite" : "map");
-  toast(settings.mapStyle === "map" ? "Χάρτης" : "Δορυφόρος");
+  toast(settings.mapStyle === "map" ? t("map.map") : t("map.sat"));
 };
 $("s-mapstyle").onchange = (e) => setMapStyle(e.target.value);
 

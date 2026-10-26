@@ -36,17 +36,5 @@ export const SEARCH = {
 
 export const DEFAULT_VIEW = { lat: 37.9838, lng: 23.7275, zoom: 13 };
 
-// Κατηγορίες για τις ατάκες και τις δικές σου ηχογραφήσεις.
-export const QUIP_CATEGORIES = {
-  start: "Ξεκίνημα",
-  left: "Αριστερά",
-  right: "Δεξιά",
-  straight: "Ευθεία",
-  uturn: "Αναστροφή",
-  roundabout: "Κυκλικός κόμβος",
-  highway: "Εθνική / ράμπες",
-  recalc: "Λάθος δρόμος",
-  speeding: "Τρέχεις",
-  idle: "Ακινησία",
-  arrive: "Άφιξη",
-};
+// Κατηγορίες για τις ατάκες και τις δικές σου ηχογραφήσεις (τα ονόματα: i18n.js, "qc.*").
+export const QUIP_KEYS = ["start", "left", "right", "straight", "uturn", "roundabout", "highway", "recalc", "speeding", "idle", "arrive"];

@@ -22,13 +22,13 @@
   <div id="top">
     <form id="search" class="card">
       <svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-      <input id="dest" type="search" placeholder="Πού πάμε, ρε;" autocomplete="off" enterkeyhint="search">
-      <button type="submit" class="search-go">Πάμε</button>
-      <button type="button" id="open-settings" class="icon-btn" aria-label="Ρυθμίσεις">
+      <input id="dest" type="search" placeholder="Πού πάμε, ρε;" data-i18n-ph="search.ph" autocomplete="off" enterkeyhint="search">
+      <button type="submit" class="search-go" data-i18n="search.go">Πάμε</button>
+      <button type="button" id="open-settings" class="icon-btn" aria-label="Ρυθμίσεις" data-i18n-aria="aria.settings">
         <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
       </button>
     </form>
-    <button id="locate" class="locate" hidden>📍 Δεν ξέρω πού είσαι — πάτα για τοποθεσία</button>
+    <button id="locate" class="locate" hidden data-i18n="locate.btn">📍 Δεν ξέρω πού είσαι — πάτα για τοποθεσία</button>
     <ul id="results" class="card list"></ul>
   </div>
 
@@ -40,14 +40,14 @@
       <div id="instr"></div>
     </div>
     <div id="then" hidden>
-      <span class="then-label">Μετά</span>
+      <span class="then-label" data-i18n="then">Μετά</span>
       <svg id="then-arrow" viewBox="0 0 48 48"></svg>
       <span id="then-instr"></span>
       <span id="then-dist"></span>
     </div>
     <div id="quip"></div>
     <div id="status" hidden></div>
-    <button id="steps-toggle" class="steps-toggle">☰ Όλες οι στροφές <span class="chev">▾</span></button>
+    <button id="steps-toggle" class="steps-toggle"><span data-i18n="steps.all">☰ Όλες οι στροφές</span> <span class="chev">▾</span></button>
   </div>
 
   <!-- πλοήγηση: όλες οι επόμενες στροφές -->
@@ -58,7 +58,7 @@
   <div id="bottom">
     <div class="fabs">
       <button id="map-style" class="fab" aria-label="Δορυφόρος">🛰</button>
-      <button id="recenter" class="fab" aria-label="Κέντρο" hidden>
+      <button id="recenter" class="fab" aria-label="Κέντρο" data-i18n-aria="aria.recenter" hidden>
         <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
       </button>
     </div>
@@ -68,13 +68,13 @@
       <div id="ribbon"></div>
       <div id="drawer" class="card">
         <button id="drawer-toggle">
-          <span>Πρόσφατα &amp; Αγαπημένα</span>
+          <span data-i18n="drawer.title">Πρόσφατα &amp; Αγαπημένα</span>
           <svg class="ico chev" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>
         </button>
         <div id="drawer-body" hidden>
           <div class="tabs">
-            <button data-tab="history">Πρόσφατα</button>
-            <button data-tab="favorites">★ Αγαπημένα</button>
+            <button data-tab="history" data-i18n="tab.history">Πρόσφατα</button>
+            <button data-tab="favorites" data-i18n="tab.favorites">★ Αγαπημένα</button>
           </div>
           <ul id="saved-list" class="list"></ul>
         </div>
@@ -85,7 +85,7 @@
     <div id="places-panel" class="card panel" hidden>
       <header>
         <h3 id="places-title"></h3>
-        <button id="places-close" class="icon-btn" aria-label="Κλείσιμο">✕</button>
+        <button id="places-close" class="icon-btn" aria-label="Κλείσιμο" data-i18n-aria="aria.close">✕</button>
       </header>
       <ul id="places-list" class="list"></ul>
     </div>
@@ -97,24 +97,24 @@
           <h3 id="preview-title"></h3>
           <small id="preview-sub"></small>
         </div>
-        <button id="preview-fav" class="icon-btn" aria-label="Αγαπημένο">☆</button>
-        <button id="preview-close" class="icon-btn" aria-label="Κλείσιμο">✕</button>
+        <button id="preview-fav" class="icon-btn" aria-label="Αγαπημένο" data-i18n-aria="aria.fav">☆</button>
+        <button id="preview-close" class="icon-btn" aria-label="Κλείσιμο" data-i18n-aria="aria.close">✕</button>
       </header>
       <ul id="route-list" class="list"></ul>
-      <button id="go" class="pill primary wide">Ξεκίνα</button>
+      <button id="go" class="pill primary wide" data-i18n="go">Ξεκίνα</button>
     </div>
 
     <!-- πλοήγηση: κάτω μπάρα -->
     <div id="navbar" class="card" hidden>
       <div class="trip">
-        <div><b id="eta-min">–</b><span>λεπτά</span></div>
-        <div><b id="eta-km">–</b><span>απόσταση</span></div>
-        <div><b id="eta-clock">–</b><span>άφιξη</span></div>
+        <div><b id="eta-min">–</b><span data-i18n="trip.min">λεπτά</span></div>
+        <div><b id="eta-km">–</b><span data-i18n="trip.dist">απόσταση</span></div>
+        <div><b id="eta-clock">–</b><span data-i18n="trip.arrive">άφιξη</span></div>
       </div>
       <div class="nav-actions">
-        <button id="mute" class="icon-btn" aria-label="Σίγαση"></button>
-        <button id="sim" class="pill">Προσομοίωση</button>
-        <button id="stop" class="pill danger">Τέλος</button>
+        <button id="mute" class="icon-btn" aria-label="Σίγαση" data-i18n-aria="aria.mute"></button>
+        <button id="sim" class="pill" data-i18n="sim">Προσομοίωση</button>
+        <button id="stop" class="pill danger" data-i18n="stop">Τέλος</button>
       </div>
     </div>
   </div>
@@ -124,7 +124,7 @@
     <div class="sheet small">
       <h3 id="actions-title"></h3>
       <div id="actions-buttons"></div>
-      <button id="actions-cancel" class="pill wide">Άκυρο</button>
+      <button id="actions-cancel" class="pill wide" data-i18n="cancel">Άκυρο</button>
     </div>
   </div>
 
@@ -132,89 +132,88 @@
   <div id="settings" class="sheet-wrap" hidden>
     <div class="sheet">
       <header>
-        <h2>Ρυθμίσεις</h2>
-        <button id="close-settings" class="pill">Κλείσιμο</button>
+        <h2 data-i18n="set.title">Ρυθμίσεις</h2>
+        <button id="close-settings" class="pill" data-i18n="close">Κλείσιμο</button>
       </header>
 
       <section>
-        <h3>Γενικά</h3>
-        <label>Μονάδες απόστασης
+        <h3 data-i18n="set.general">Γενικά</h3>
+        <label><span data-i18n="set.uiLang">Γλώσσα εφαρμογής</span> 🌐
+          <select id="s-uilang"></select>
+        </label>
+        <label><span data-i18n="set.units">Μονάδες απόστασης</span>
           <select id="s-units">
-            <option value="auto">Αυτόματα (από τη γλώσσα του κινητού)</option>
-            <option value="km">Χιλιόμετρα</option>
-            <option value="mi">Μίλια</option>
+            <option value="auto" data-i18n="units.auto">Αυτόματα (από τη γλώσσα του κινητού)</option>
+            <option value="km" data-i18n="units.km">Χιλιόμετρα</option>
+            <option value="mi" data-i18n="units.mi">Μίλια</option>
           </select>
         </label>
-        <label>Εμφάνιση χάρτη
+        <label><span data-i18n="set.mapStyle">Εμφάνιση χάρτη</span>
           <select id="s-mapstyle">
-            <option value="map">Χάρτης (δρόμοι)</option>
-            <option value="satellite">Δορυφόρος</option>
+            <option value="map" data-i18n="map.mapLong">Χάρτης (δρόμοι)</option>
+            <option value="satellite" data-i18n="map.sat">Δορυφόρος</option>
           </select>
         </label>
       </section>
 
       <section>
-        <h3>Φωνή</h3>
-        <label>Φωνή ανάγνωσης
-          <select id="s-voice"><option value="">Αυτόματα (ελληνική)</option></select>
+        <h3 data-i18n="set.voice">Φωνή</h3>
+        <label><span data-i18n="set.voicePick">Φωνή ανάγνωσης</span>
+          <select id="s-voice"><option value="" data-i18n="voice.auto">Αυτόματα</option></select>
         </label>
-        <p class="hint" id="voice-hint">Για καλύτερη ελληνική φωνή στο iPhone: Ρυθμίσεις → Προσβασιμότητα → Εκφώνηση περιεχομένου → Φωνές → Ελληνικά, και κατέβασε μια «Βελτιωμένη».</p>
-        <label>Ταχύτητα <output id="o-rate"></output>
+        <p class="hint" id="voice-hint" data-i18n="voice.hint"></p>
+        <label><span data-i18n="set.rate">Ταχύτητα</span> <output id="o-rate"></output>
           <input id="s-rate" type="range" min="0.6" max="1.6" step="0.1">
         </label>
-        <label>Τόνος <output id="o-pitch"></output>
+        <label><span data-i18n="set.pitch">Τόνος</span> <output id="o-pitch"></output>
           <input id="s-pitch" type="range" min="0.5" max="1.8" step="0.1">
         </label>
-        <label>Ένταση <output id="o-volume"></output>
+        <label><span data-i18n="set.volume">Ένταση</span> <output id="o-volume"></output>
           <input id="s-volume" type="range" min="0" max="1" step="0.1">
         </label>
-        <button id="test-voice" class="pill wide">▶ Δοκιμή φωνής</button>
+        <button id="test-voice" class="pill wide" data-i18n="voice.test">▶ Δοκιμή φωνής</button>
       </section>
 
       <section>
-        <h3>Ήχος</h3>
-        <label>Τι ακούγεται
+        <h3 data-i18n="set.sound">Ήχος</h3>
+        <label><span data-i18n="set.mode">Τι ακούγεται</span>
           <select id="s-mode">
-            <option value="both">Οδηγίες + ατάκες</option>
-            <option value="quips">Μόνο ατάκες</option>
-            <option value="plain">Μόνο οδηγίες (σοβαρό)</option>
-            <option value="mute">Σίγαση</option>
+            <option value="both" data-i18n="mode.both">Οδηγίες + ατάκες</option>
+            <option value="quips" data-i18n="mode.quips">Μόνο ατάκες</option>
+            <option value="plain" data-i18n="mode.plain">Μόνο οδηγίες (σοβαρό)</option>
+            <option value="mute" data-i18n="mode.mute">Σίγαση</option>
           </select>
         </label>
-        <label>Γλώσσα ατάκων
-          <select id="s-lang">
-            <option value="el">Ελληνικά</option>
-            <option value="pnt">Ποντιακά</option>
-            <option value="mix">Ανάμικτα</option>
-          </select>
+        <label><span data-i18n="set.quipLang">Γλώσσα ατάκων</span>
+          <select id="s-lang"></select>
         </label>
-        <label class="row">Ήχος «ντινγκ» πριν από κάθε οδηγία
+        <label class="row"><span data-i18n="set.chime">Ήχος «ντινγκ» πριν από κάθε οδηγία</span>
           <input id="s-chime" type="checkbox">
         </label>
-        <label>Προειδοποίηση ταχύτητας πάνω από <output id="o-speed"></output>
+        <label><span data-i18n="set.speed">Προειδοποίηση ταχύτητας πάνω από</span> <output id="o-speed"></output>
           <input id="s-speed" type="range" min="50" max="160" step="10">
         </label>
-        <p class="hint">Ο ήχος βγαίνει εκεί που τον στέλνει το κινητό: ηχείο, ακουστικά ή αυτοκίνητο μέσω Bluetooth.</p>
+        <p class="hint" data-i18n="sound.hint"></p>
       </section>
 
       <section>
-        <h3>Οι δικές μου ηχογραφήσεις</h3>
-        <p class="hint">Ηχογράφησε τη φωνή σου (ή ανέβασε αρχείο ήχου) για κάθε περίπτωση. Μένουν αποθηκευμένα σε αυτό το κινητό.</p>
-        <label>Περίπτωση
+        <h3 data-i18n="set.rec">Οι δικές μου ηχογραφήσεις</h3>
+        <p class="hint" data-i18n="rec.hint"></p>
+        <label><span data-i18n="rec.cat">Περίπτωση</span>
           <select id="rec-cat"></select>
         </label>
         <div class="rec-buttons">
-          <button id="rec-btn" class="pill rec">● Ηχογράφηση</button>
-          <label class="pill file">Ανέβασμα αρχείου
+          <button id="rec-btn" class="pill rec" data-i18n="rec.record">● Ηχογράφηση</button>
+          <label class="pill file"><span data-i18n="rec.upload">Ανέβασμα αρχείου</span>
             <input id="rec-file" type="file" accept="audio/*" hidden>
           </label>
         </div>
         <ul id="rec-list"></ul>
-        <label>Πώς παίζονται
+        <label><span data-i18n="rec.how">Πώς παίζονται</span>
           <select id="s-myaudio">
-            <option value="mix">Ανάμικτα με τις γραπτές ατάκες</option>
-            <option value="only">Μόνο οι δικές μου (όπου υπάρχουν)</option>
-            <option value="off">Ποτέ</option>
+            <option value="mix" data-i18n="my.mix">Ανάμικτα με τις γραπτές ατάκες</option>
+            <option value="only" data-i18n="my.only">Μόνο οι δικές μου (όπου υπάρχουν)</option>
+            <option value="off" data-i18n="my.off">Ποτέ</option>
           </select>
         </label>
       </section>

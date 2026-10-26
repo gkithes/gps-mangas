@@ -5,7 +5,8 @@
 // και την ξαναλέμε — ώστε να μη χαθεί καμία οδηγία.
 
 import { PHRASES } from "./phrases.js";
-import { QUIP_CATEGORIES } from "./config.js";
+import { WORLD_PHRASES } from "./phrases-world.js";
+import { t, lang, locale } from "./i18n.js";
 import { settings } from "./store.js";
 import { recordingsFor } from "./recordings.js";
 
@@ -55,13 +56,17 @@ function chime() {
 // ---------- φωνές ----------
 
 export const voices = () => (hasSpeech ? speechSynthesis.getVoices() : []);
-export const isGreek = (v) => v.lang?.toLowerCase().startsWith("el");
+export const speaks = (v, code) => v.lang?.toLowerCase().startsWith(code);
 export function onVoicesChanged(fn) {
   if (!hasSpeech) return;
   fn();
   speechSynthesis.onvoiceschanged = fn;
 }
-const currentVoice = () => voices().find((v) => v.voiceURI === settings.voiceURI) || voices().find(isGreek) || null;
+// Η φωνή που διάλεξες, αν μιλάει αυτή τη γλώσσα· αλλιώς η καλύτερη για τη γλώσσα.
+function voiceFor(code) {
+  const all = voices().filter((v) => speaks(v, code));
+  return all.find((v) => v.voiceURI === settings.voiceURI) || all.find((v) => v.localService && v.default) || all.find((v) => v.localService) || all[0] || null;
+}
 
 // ---------- ουρά ομιλίας ----------
 
@@ -75,10 +80,11 @@ export function stopSound() {
   player.pause();
 }
 
-export function speak(text, interrupt = false) {
+// code: η γλώσσα της φράσης (π.χ. "el", "en") — αλλιώς η γλώσσα της εφαρμογής.
+export function speak(text, interrupt = false, code = lang()) {
   if (settings.mode === "mute" || !text || !hasSpeech) return;
   if (interrupt) stopSound();
-  speech.queue.push({ text, tries: 0 });
+  speech.queue.push({ text, code, tries: 0 });
   // στο iPhone, μια φράση αμέσως μετά το cancel() χάνεται — μικρή αναμονή
   setTimeout(pump, interrupt ? 120 : 0);
 }
@@ -122,8 +128,8 @@ function pump() {
   } catch {}
   chime();
   const u = new SpeechSynthesisUtterance(item.text);
-  const v = currentVoice();
-  u.lang = v ? v.lang : "el-GR";
+  const v = voiceFor(item.code);
+  u.lang = v ? v.lang : locale(item.code);
   if (v) u.voice = v;
   u.rate = settings.rate;
   u.pitch = settings.pitch;
@@ -158,11 +164,22 @@ export function playClip(clip, interrupt = true) {
 
 const lastPicked = {};
 
+// Η γλώσσα των ατάκων: el | pnt | mix (Ελληνικά + Ποντιακά) | en | es | fr | de | it | pt
+export const quipLangs = () => ["el", "pnt", "mix", ...Object.keys(WORLD_PHRASES.start)];
+
+function textsFor(category) {
+  const greek = PHRASES[category] || {};
+  const world = WORLD_PHRASES[category] || {};
+  const l = settings.lang;
+  if (l === "mix") return { code: "el", texts: [...(greek.el || []), ...(greek.pnt || [])] };
+  if (l === "pnt") return { code: "el", texts: greek.pnt?.length ? greek.pnt : greek.el || [] };
+  if (l === "el" || !world[l]) return { code: "el", texts: greek.el || [] };
+  return { code: l, texts: world[l] };
+}
+
 // Γραπτή ατάκα (τη διαβάζει η φωνή) ή δική σου ηχογράφηση.
 function pick(category) {
-  const set = PHRASES[category] || { el: [] };
-  const texts =
-    settings.lang === "mix" ? [...(set.el || []), ...(set.pnt || [])] : set[settings.lang]?.length ? set[settings.lang] : set.el || [];
+  const { code, texts } = textsFor(category);
   const clips = settings.myAudio === "off" ? [] : recordingsFor(category);
   const pool =
     settings.myAudio === "only" && clips.length
@@ -174,7 +191,7 @@ function pick(category) {
     p = pool[Math.floor(Math.random() * pool.length)];
   } while (pool.length > 1 && (p.text || p.clip.id) === lastPicked[category]);
   lastPicked[category] = p.text || p.clip.id;
-  return p;
+  return { ...p, code };
 }
 
 // Λέει την ατάκα της κατηγορίας (στο «σοβαρό» μόνο την κανονική οδηγία).
@@ -187,8 +204,8 @@ export function quip(category, plainText, interrupt = true) {
   const p = pick(category);
   if (p.clip) {
     playClip(p.clip, interrupt);
-    return "🎙 " + (p.clip.name || QUIP_CATEGORIES[category]);
+    return "🎙 " + (p.clip.name || t(`qc.${category}`));
   }
-  speak(p.text, interrupt);
+  speak(p.text, interrupt, p.code);
   return p.text;
 }

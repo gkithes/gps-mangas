@@ -7,6 +7,7 @@ import { map, layers, setMode, setDestMarker, fitPadding, toast, listMessage } f
 import { duration, shortDist, clockIn } from "./format.js";
 import { fetchRoutes } from "./route.js";
 import { startNavigation } from "./nav.js";
+import { t } from "./i18n.js";
 
 export async function previewDestination(dest) {
   const want = (state.dest = { lat: +dest.lat, lng: +dest.lng, name: dest.name, sub: dest.sub || "" });
@@ -21,14 +22,14 @@ export async function previewDestination(dest) {
   setDestMarker(want);
 
   const from = origin();
-  if (!from) return listMessage($("route-list"), "📍 Χρειάζομαι την τοποθεσία σου για να βρω διαδρομή. Πάτα το κόκκινο κουμπί πάνω.");
-  listMessage($("route-list"), "Βρίσκω διαδρομές…", "loading");
+  if (!from) return listMessage($("route-list"), t("route.noLocation"));
+  listMessage($("route-list"), t("route.finding"), "loading");
 
   let routes;
   try {
     routes = await fetchRoutes(from, want);
   } catch {
-    if (state.mode === "preview" && state.dest === want) listMessage($("route-list"), "Δεν βρήκα δρόμο. Με βάρκα θα πας;");
+    if (state.mode === "preview" && state.dest === want) listMessage($("route-list"), t("route.none"));
     return;
   }
   if (state.mode !== "preview" || state.dest !== want) return; // άλλαξες στο μεταξύ
@@ -79,17 +80,17 @@ export function renderCards() {
   state.routes.forEach((r, i) => {
     const li = document.createElement("li");
     li.className = "route" + (i === state.selected ? " sel" : "");
-    const tag = i === 0 ? '<span class="tag">Ταχύτερη</span>' : `<span class="tag slow">+${Math.round((r.duration - fastest) / 60)} λεπ.</span>`;
+    const tag = i === 0 ? `<span class="tag">${t("route.fastest")}</span>` : `<span class="tag slow">${t("route.slower", { n: Math.round((r.duration - fastest) / 60) })}</span>`;
     const flags = [
-      `<span>🕐 άφιξη ${clockIn(r.duration)}</span>`,
-      `<span>↪ ${r.turns} ${r.turns === 1 ? "στροφή" : "στροφές"}</span>`,
-      r.motorway ? "<span>🛣 Αυτοκινητόδρομος</span>" : "<span>🏘 Χωρίς αυτοκινητόδρομο</span>",
-      r.toll ? '<span class="warn">💶 Διόδια</span>' : "<span>Χωρίς διόδια</span>",
-      r.ferry ? '<span class="warn">⛴ Πλοίο</span>' : "",
+      `<span>${t("route.arrive", { time: clockIn(r.duration) })}</span>`,
+      `<span>${r.turns === 1 ? t("route.turn1") : t("route.turns", { n: r.turns })}</span>`,
+      `<span>${r.motorway ? t("route.motorway") : t("route.noMotorway")}</span>`,
+      r.toll ? `<span class="warn">${t("route.toll")}</span>` : `<span>${t("route.noToll")}</span>`,
+      r.ferry ? `<span class="warn">${t("route.ferry")}</span>` : "",
     ].join("");
     li.innerHTML = `
       <div class="line1"><span class="time">${duration(r.duration)}</span><span class="dist">${shortDist(r.distance)}</span>${tag}</div>
-      ${r.via ? `<div class="via">μέσω ${escapeHtml(r.via)}</div>` : ""}
+      ${r.via ? `<div class="via">${t("route.via", { via: escapeHtml(r.via) })}</div>` : ""}
       <div class="flags">${flags}</div>`;
     li.onclick = () => select(i);
     ul.appendChild(li);
@@ -104,7 +105,7 @@ function renderFav() {
 
 $("preview-fav").onclick = () => {
   if (!state.dest) return;
-  toast(places.toggleFavorite(state.dest) ? "Μπήκε στα αγαπημένα" : "Βγήκε από τα αγαπημένα");
+  toast(places.toggleFavorite(state.dest) ? t("fav.added") : t("fav.removed"));
   renderFav();
 };
 $("preview-close").onclick = () => setMode("home");

@@ -1,6 +1,7 @@
 // Εκκίνηση: συνδέει όλα τα κομμάτια.
 
 import { onError } from "./util.js";
+import { applyStatic, t } from "./i18n.js";
 import { lastPos, places } from "./store.js";
 import { state } from "./state.js";
 import { map, showUser, setMode, toast } from "./ui.js";
@@ -20,7 +21,7 @@ onError((e) => {
   console.error(e);
   if (Date.now() - lastErrorToast > 30000) {
     lastErrorToast = Date.now();
-    toast("Κάτι στράβωσε, αλλά συνεχίζω.");
+    toast(t("app.error"));
   }
 });
 window.addEventListener("error", (e) => console.error(e.error || e.message));
@@ -40,6 +41,7 @@ onPosition((pos) => {
   else POI.refresh(pos).catch(() => {}); // κοντινά μέρη στο παρασκήνιο, για να είναι έτοιμα
 });
 
+applyStatic(); // κείμενα της σελίδας στη γλώσσα της εφαρμογής
 loadRecordings();
 setMode("home");
 renderDrawer();

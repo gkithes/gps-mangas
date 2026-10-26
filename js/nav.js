@@ -9,6 +9,7 @@ import { spokenDist, shortDist, clockIn } from "./format.js";
 import { fetchRoutes, locate, instruction, quipCategory, arrowSvg } from "./route.js";
 import { speak, quip, stopSound } from "./voice.js";
 import { feed } from "./gps.js";
+import { t } from "./i18n.js";
 
 // ---------- εμφάνιση ----------
 
@@ -93,7 +94,7 @@ export function startNavigation(route) {
   setStatus("");
   keepAwake(true);
   const first = route.steps[1] || route.steps[0];
-  showStep(first, first.along, quip("start", "Ξεκινάμε"));
+  showStep(first, first.along, quip("start", t("say.start")));
   showTrip(0);
   lastAlong = 0;
   showUpcoming(0);
@@ -122,10 +123,10 @@ export async function reroute() {
   state.lastReroute = Date.now();
   if (!state.recalcSpoken) {
     state.recalcSpoken = true;
-    showStep(null, null, quip("recalc", "Επανυπολογισμός διαδρομής"));
-    $("instr").textContent = "Επανυπολογισμός…";
+    showStep(null, null, quip("recalc", t("say.recalc")));
+    $("instr").textContent = t("nav.recalc");
   }
-  setStatus("Βρίσκω νέα διαδρομή…");
+  setStatus(t("nav.findingRoute"));
   try {
     const [r] = await fetchRoutes(state.pos, state.dest, false);
     if (!state.navigating) return;
@@ -133,7 +134,7 @@ export async function reroute() {
     setStatus("");
     guide(state.pos);
   } catch {
-    setStatus("Δεν απαντάει ο χάρτης — ξαναδοκιμάζω…");
+    setStatus(t("nav.mapDown"));
   } finally {
     state.rerouting = false;
   }
@@ -152,7 +153,7 @@ export function guide(pos) {
   // ταχύτητα
   if (kmh != null && kmh > settings.speedLimit && now - state.lastSpeedWarn > 60000) {
     state.lastSpeedWarn = now;
-    quip("speeding", "Προσοχή, υπερβολική ταχύτητα", false);
+    quip("speeding", t("say.speeding"), false);
   }
 
   // ακινησία
@@ -208,7 +209,7 @@ export function guide(pos) {
   if (step.type === "arrive" && (d < NAV.ARRIVE_M || haversine(here, step.loc) < 30)) {
     if (!state.arrived) {
       state.arrived = true;
-      showStep(step, null, quip("arrive", "Έφτασες στον προορισμό"));
+      showStep(step, null, quip("arrive", t("dir.arrive")));
       setStatus("");
       stopSim();
     }
@@ -225,15 +226,15 @@ export function guide(pos) {
   if (!a.intro) {
     a.intro = true;
     if (d > farDist + 150 && settings.mode !== "quips") {
-      const then = step.type === "arrive" ? "φτάνεις στον προορισμό" : lowerFirst(instr);
-      speak(`Συνέχισε για ${spokenDist(d)}, και μετά ${then}`);
+      const then = step.type === "arrive" ? t("say.arriveThen") : lowerFirst(instr);
+      speak(t("say.continueThen", { d: spokenDist(d), then }));
     }
   }
 
   if (!a.far && d <= farDist && d > nearDist) {
     a.far = true;
     if (settings.mode !== "quips") {
-      speak(step.type === "arrive" ? `Σε ${spokenDist(d)} φτάνεις στον προορισμό` : `Σε ${spokenDist(d)}, ${lowerFirst(instr)}`);
+      speak(step.type === "arrive" ? t("say.arriveIn", { d: spokenDist(d) }) : t("say.inDist", { d: spokenDist(d), instr: lowerFirst(instr) }));
     }
   }
 
@@ -270,18 +271,18 @@ document.addEventListener("pointerdown", () => state.navigating && keepAwake(tru
 export function stopSim() {
   clearInterval(state.simTimer);
   state.simTimer = null;
-  $("sim").textContent = "Προσομοίωση";
+  $("sim").textContent = t("sim");
 }
 
 function toggleSim() {
   if (state.simTimer) return stopSim();
-  if (!state.route) return toast("Βάλε πρώτα προορισμό.");
+  if (!state.route) return toast(t("nav.needDest"));
   const coords = state.route.coords;
   const SPEED = 14; // m/s ≈ 50 χλμ/ώρα
   let i = 0;
   let along = 0;
   state.follow = true;
-  $("sim").textContent = "Παύση";
+  $("sim").textContent = t("sim.pause");
   state.simTimer = setInterval(() => {
     let move = SPEED;
     while (i < coords.length - 1) {
@@ -310,7 +311,7 @@ function toggleSim() {
 $("sim").onclick = toggleSim;
 $("stop").onclick = () => {
   stopNavigation();
-  speak("Άντε, γεια.", true);
+  speak(t("say.bye"), true);
 };
 
 const SPEAKER_ON = '<svg class="ico" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>';
@@ -332,5 +333,5 @@ export function toggleMute() {
     stopSound();
   }
   renderMute();
-  toast(settings.mode === "mute" ? "Σίγαση" : "Ήχος ανοιχτός");
+  toast(settings.mode === "mute" ? t("nav.muted") : t("nav.unmuted"));
 }

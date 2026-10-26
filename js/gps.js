@@ -6,6 +6,7 @@ import { state } from "./state.js";
 import { setStatus, toast, openActions } from "./ui.js";
 import { wakeAudio, stopSound } from "./voice.js";
 import { reroute, reannounce, keepAwake } from "./nav.js";
+import { t } from "./i18n.js";
 
 const bootTime = Date.now();
 let handler = () => {};
@@ -75,7 +76,7 @@ function onFix(p) {
 function onGpsError(e) {
   if (e.code === 1) {
     state.gpsDenied = true;
-    toast("Δεν έχω άδεια τοποθεσίας — πάτα το κόκκινο κουμπί πάνω");
+    toast(t("gps.denied"));
   }
   renderLocate(); // για τα υπόλοιπα (χάθηκε σήμα, timeout) ο φύλακας κάνει επανεκκίνηση
 }
@@ -92,7 +93,7 @@ export function renderLocate() {
 export function requestLocation() {
   if (!("geolocation" in navigator)) return locationHelp(true);
   state.gpsDenied = false;
-  toast("Ψάχνω πού είσαι…");
+  toast(t("gps.finding"));
   navigator.geolocation.getCurrentPosition(
     (p) => {
       onFix(p);
@@ -106,12 +107,12 @@ export function requestLocation() {
 function locationHelp(denied) {
   openActions(
     {
-      html: `<p><b>${denied ? "Η εφαρμογή δεν έχει άδεια για την τοποθεσία σου." : "Δεν βρίσκω την τοποθεσία σου."}</b></p>
-      <p>Στο iPhone: <b>Ρυθμίσεις → Απόρρητο & Ασφάλεια → Υπηρεσίες τοποθεσίας</b> (ανοιχτό) → <b>Ιστότοποι Safari</b> → «Κατά τη χρήση» και «Ακριβής τοποθεσία».</p>
-      ${denied ? "" : "<p>Αν η άδεια είναι ήδη εντάξει, βγες σε ανοιχτό χώρο (μακριά από κτίρια) και ξαναδοκίμασε.</p>"}
-      <p>Μετά κλείσε τελείως την εφαρμογή και άνοιξέ την ξανά.</p>`,
+      html: `<p><b>${denied ? t("gps.helpDenied") : t("gps.helpNotFound")}</b></p>
+      <p>${t("gps.helpSteps")}</p>
+      ${denied ? "" : `<p>${t("gps.helpOutside")}</p>`}
+      <p>${t("gps.helpRestart")}</p>`,
     },
-    [{ label: "🔄  Δοκίμασε ξανά", fn: requestLocation }]
+    [{ label: t("gps.retry"), fn: requestLocation }]
   );
 }
 $("locate").onclick = requestLocation;
@@ -129,7 +130,7 @@ function watchdog() {
   if (!state.navigating) return;
   if (silent && !state.arrived && !state.gpsLost) {
     state.gpsLost = true;
-    setStatus("Ψάχνω σήμα GPS…");
+    setStatus(t("gps.lost"));
   }
 
   // εκτός διαδρομής και απέτυχε ο υπολογισμός; ξαναδοκίμασε

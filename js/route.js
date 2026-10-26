@@ -3,6 +3,7 @@
 import { SERVERS } from "./config.js";
 import { getJSON } from "./net.js";
 import { haversine } from "./util.js";
+import { t } from "./i18n.js";
 
 export async function fetchRoutes(from, to, alternatives = true) {
   const path = `${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=true&alternatives=${alternatives ? 3 : "false"}`;
@@ -99,17 +100,7 @@ export function locate(r, p) {
 
 // ---------- κείμενα & εικονίδια ----------
 
-const MOD = {
-  left: "αριστερά",
-  right: "δεξιά",
-  "slight left": "ελαφρώς αριστερά",
-  "slight right": "ελαφρώς δεξιά",
-  "sharp left": "απότομα αριστερά",
-  "sharp right": "απότομα δεξιά",
-  straight: "ευθεία",
-  uturn: "αναστροφή",
-};
-
+const MODS = ["left", "right", "slight left", "slight right", "sharp left", "sharp right", "straight", "uturn"];
 const ANGLE = { straight: 0, "slight right": 45, right: 90, "sharp right": 135, "slight left": -45, left: -90, "sharp left": -135 };
 
 // Ποια κατηγορία ατάκας ταιριάζει σε μια στροφή.
@@ -125,29 +116,39 @@ export function quipCategory(step) {
   return "straight";
 }
 
+// Το κείμενο της οδηγίας στη γλώσσα της εφαρμογής, π.χ. «Στρίψε αριστερά, προς Ερμού».
 export function instruction(step) {
-  const m = MOD[step.modifier] || "";
-  const onto = step.name ? `, προς ${step.name}` : "";
+  const m = MODS.includes(step.modifier) ? t(`mod.${step.modifier}`) : "";
+  const onto = step.name ? t("dir.onto", { name: step.name }) : "";
+  let s;
   switch (step.type) {
     case "arrive":
-      return "Έφτασες στον προορισμό";
+      s = t("dir.arrive");
+      break;
     case "roundabout":
     case "rotary":
-      return step.exit ? `Στον κυκλικό κόμβο, πάρε την ${step.exit}η έξοδο${onto}` : `Μπες στον κυκλικό κόμβο${onto}`;
+      s = step.exit ? t("dir.rbExit", { n: step.exit, onto }) : t("dir.rb", { onto });
+      break;
     case "exit roundabout":
     case "exit rotary":
-      return `Βγες από τον κυκλικό κόμβο${onto}`;
+      s = t("dir.rbOut", { onto });
+      break;
     case "on ramp":
-      return `Μπες στη ράμπα ${m}${onto}`.trim();
+      s = t("dir.onRamp", { m, onto });
+      break;
     case "off ramp":
-      return `Πάρε την έξοδο ${m}${onto}`.trim();
+      s = t("dir.offRamp", { m, onto });
+      break;
     case "merge":
-      return `Μπες στην κυκλοφορία ${m}${onto}`.trim();
+      s = t("dir.merge", { m, onto });
+      break;
     default:
-      if (step.modifier === "uturn") return "Κάνε αναστροφή";
-      if (step.modifier === "straight") return `Συνέχισε ευθεία${onto}`;
-      return `Στρίψε ${m}${onto}`;
+      if (step.modifier === "uturn") s = t("dir.uturn");
+      else if (step.modifier === "straight") s = t("dir.straight", { onto });
+      else s = t("dir.turn", { m, onto });
   }
+  s = s.replace(/\s+,/g, ",").replace(/\s{2,}/g, " ").trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 export function arrowSvg(step) {
