@@ -269,6 +269,7 @@ body.navigating #top { display: none; }
 .sheet input[type=checkbox] { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
 .sheet output { float: inline-end; color: var(--muted); }
 .hint { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.hint.version { text-align: center; margin: 4px 0 12px; }
 
 .sheet.small { padding-top: 16px; }
 .sheet.small h3 { margin: 0 0 12px; font-size: 16px; font-weight: 600; text-align: center; color: var(--muted); }

@@ -11,6 +11,7 @@ import { guide } from "./nav.js";
 import { onPosition, feed, startGps, renderLocate } from "./gps.js";
 import { renderDrawer } from "./drawer.js";
 import { nearbyFollow } from "./nearby.js";
+import { APP_VERSION } from "./config.js";
 import "./preview.js";
 import "./nearby.js";
 import "./search.js";
@@ -47,6 +48,7 @@ onPosition((pos) => {
   }
 });
 
+$("app-version").textContent = `GPS Μάγκας ${APP_VERSION}`;
 applyStatic(); // κείμενα της σελίδας στη γλώσσα της εφαρμογής
 
 // Μέσα στο Safari η μπάρα του Safari κρύβει μέρος της οθόνης. Μόνο από το εικονίδιο
@@ -66,7 +68,17 @@ startGps();
 if (lastPos.value) setTimeout(() => !state.pos && POI.refresh(lastPos.value).catch(() => {}), 1500);
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+  // Έλεγχος για νέα έκδοση σε κάθε άνοιγμα, κάθε φορά που γυρίζεις στην εφαρμογή και κάθε 30′
+  // (το iPhone από μόνο του ελέγχει σπάνια όταν ανοίγει από την αρχική οθόνη).
+  navigator.serviceWorker
+    .register("sw.js", { updateViaCache: "none" })
+    .then((reg) => {
+      const check = () => !state.navigating && reg.update().catch(() => {});
+      check();
+      document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && check());
+      setInterval(check, 30 * 60e3);
+    })
+    .catch(() => {});
   // Όταν έρθει νέα έκδοση, ξαναφόρτωσε αμέσως (όχι στη μέση μιας διαδρομής),
   // ώστε οι διορθώσεις να φτάνουν με το πρώτο άνοιγμα.
   const hadController = !!navigator.serviceWorker.controller;

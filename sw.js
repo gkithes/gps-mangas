@@ -1,7 +1,7 @@
 // Service worker: η εφαρμογή ανοίγει αμέσως από τη μνήμη του κινητού και ενημερώνεται
 // στο παρασκήνιο. Κρατάει και τα κομμάτια του χάρτη που έχεις δει.
 
-const VERSION = "v2.7.0";
+const VERSION = "v2.7.1"; // ίδιο με το APP_VERSION στο js/config.js
 const APP = `gps-mangas-app-${VERSION}`;
 const TILES = "gps-mangas-tiles";
 const MAX_TILES = 1500;
@@ -14,7 +14,9 @@ const FILES = [
 ];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(APP).then((c) => c.addAll(FILES)));
+  // cache: "reload" = κατευθείαν από τον διακομιστή, ποτέ από την προσωρινή μνήμη του browser
+  // (αλλιώς η νέα έκδοση μπορεί να αποθηκευτεί με τα ΠΑΛΙΑ αρχεία)
+  e.waitUntil(caches.open(APP).then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: "reload" })))));
   self.skipWaiting();
 });
 
@@ -27,7 +29,7 @@ self.addEventListener("activate", (e) => {
 async function app(req) {
   const cache = await caches.open(APP);
   const hit = await cache.match(req, { ignoreSearch: true });
-  const fresh = fetch(req)
+  const fresh = fetch(req.url, { cache: "no-cache" })
     .then((res) => {
       if (res.ok) cache.put(req, res.clone());
       return res;
