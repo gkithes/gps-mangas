@@ -12,6 +12,12 @@ import { recordingsFor, addRecording, removeRecording } from "./recordings.js";
 import { renderMute, toggleMute } from "./nav.js";
 import { renderDrawer } from "./drawer.js";
 import { renderCards } from "./preview.js";
+import { clearAll as clearNearby } from "./poi.js";
+
+$("clear-poi").onclick = () => {
+  clearNearby();
+  toast(t("poi.cleared"));
+};
 
 $("open-settings").onclick = () => {
   $("settings").hidden = false;

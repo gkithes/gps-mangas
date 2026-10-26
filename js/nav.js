@@ -128,7 +128,7 @@ export async function reroute() {
   }
   setStatus(t("nav.findingRoute"));
   try {
-    const [r] = await fetchRoutes(state.pos, state.dest, false);
+    const [r] = await fetchRoutes(state.pos, state.dest, false, state.route?.travel);
     if (!state.navigating) return;
     useRoute(r);
     setStatus("");
@@ -149,15 +149,16 @@ export function guide(pos) {
   if (state.follow) map.panTo(here, { animate: true });
   const now = Date.now();
   const kmh = pos.speed != null ? pos.speed * 3.6 : null;
+  const walking = route.travel === "walk";
 
-  // ταχύτητα
-  if (kmh != null && kmh > settings.speedLimit && now - state.lastSpeedWarn > 60000) {
+  // ταχύτητα (όχι για πεζούς)
+  if (!walking && kmh != null && kmh > settings.speedLimit && now - state.lastSpeedWarn > 60000) {
     state.lastSpeedWarn = now;
     quip("speeding", t("say.speeding"), false);
   }
 
-  // ακινησία
-  if (kmh != null && kmh < 3) {
+  // ακινησία (όχι για πεζούς — περιμένουν στα φανάρια)
+  if (!walking && kmh != null && kmh < 3) {
     state.stillSince ||= now;
     if (now - state.stillSince > NAV.IDLE_S * 1000 && now - state.lastIdleWarn > 120000) {
       state.lastIdleWarn = now;
@@ -169,7 +170,7 @@ export function guide(pos) {
 
   // εκτός διαδρομής;
   const loc = locate(route, here);
-  if (loc.off > NAV.OFF_ROUTE_M && (pos.accuracy || 0) < 60) {
+  if (loc.off > (walking ? NAV.OFF_ROUTE_WALK_M : NAV.OFF_ROUTE_M) && (pos.accuracy || 0) < 60) {
     if (++state.offCount >= NAV.OFF_ROUTE_FIXES) {
       state.offRoute = true;
       if (now - state.lastReroute > NAV.REROUTE_RETRY_MS) reroute();
@@ -217,9 +218,10 @@ export function guide(pos) {
   }
 
   // πόσο νωρίς ειδοποιεί: στην εθνική νωρίτερα
-  const v = pos.speed != null && pos.speed > 1 ? pos.speed : 13;
-  const farDist = Math.min(800, Math.max(200, v * 15));
-  const nearDist = Math.min(120, Math.max(40, v * 3.5));
+  // πεζός: «σε 60 μέτρα…», «εδώ στρίψε»
+  const v = pos.speed != null && pos.speed > (walking ? 0.3 : 1) ? pos.speed : walking ? 1.4 : 13;
+  const farDist = walking ? 80 : Math.min(800, Math.max(200, v * 15));
+  const nearDist = walking ? 20 : Math.min(120, Math.max(40, v * 3.5));
   const a = state.announced;
 
   // μόλις φανεί νέα στροφή μακριά: «Συνέχισε για 2 χλμ και μετά…» — για να ξέρεις ότι σε ακούει
@@ -278,7 +280,7 @@ function toggleSim() {
   if (state.simTimer) return stopSim();
   if (!state.route) return toast(t("nav.needDest"));
   const coords = state.route.coords;
-  const SPEED = 14; // m/s ≈ 50 χλμ/ώρα
+  const SPEED = state.route.travel === "walk" ? 4 : 14; // m/s: γρήγορος «πεζός» / ≈ 50 χλμ/ώρα
   let i = 0;
   let along = 0;
   state.follow = true;

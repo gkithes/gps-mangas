@@ -5,6 +5,8 @@ export const SERVERS = {
     "https://router.project-osrm.org/route/v1/driving/",
     "https://routing.openstreetmap.de/routed-car/route/v1/driving/",
   ],
+  // με τα πόδια: μόνο ο διακομιστής FOSSGIS έχει διαδρομές για πεζούς
+  walk: ["https://routing.openstreetmap.de/routed-foot/route/v1/driving/"],
   photon: "https://photon.komoot.io/api/",
   nominatim: "https://nominatim.openstreetmap.org/search",
   overpass: [
@@ -21,6 +23,7 @@ export const SERVERS = {
 
 export const NAV = {
   OFF_ROUTE_M: 60,        // πόσο μακριά από τη γραμμή = εκτός διαδρομής
+  OFF_ROUTE_WALK_M: 40,   // …για πεζούς
   OFF_ROUTE_FIXES: 3,     // πόσες συνεχόμενες θέσεις εκτός πριν ξαναϋπολογίσει
   PASSED_M: 8,            // πόσο μετά τη στροφή θεωρείται «περασμένη»
   BACKTRACK_M: 60,        // μόνο αν γυρίσεις πίσω τόσο, ξαναγυρίζει σε προηγούμενη στροφή

@@ -42,7 +42,20 @@ export const CATS = {
 };
 
 // Κάθε περιοχή: { lat, lng, ts, kind: "full" | "wide:<cat>" | "quick", items: [[cat, lat, lng, name, sub]] }
+// Αλλάζει όταν πρέπει να σβηστούν τα παλιά αποθηκευμένα (π.χ. μετά από διόρθωση).
+const DATA_VERSION = 2;
 let areas = loadJSON(KEY, []).map((a) => ({ kind: a.kind || (a.partial ? (a.partial === "quick" ? "quick" : `wide:${a.partial}`) : "full"), ...a }));
+if (loadJSON(`${KEY}-version`, 0) !== DATA_VERSION) {
+  areas = [];
+  saveJSON(KEY, areas);
+  saveJSON(`${KEY}-version`, DATA_VERSION);
+}
+
+// Κουμπί στις ρυθμίσεις: σβήνει όλα τα αποθηκευμένα κοντινά μέρη.
+export function clearAll() {
+  areas = [];
+  saveJSON(KEY, areas);
+}
 let inflight = null;
 let lastFail = 0;
 
@@ -183,7 +196,8 @@ const toPlace = (it, pos) => ({ cat: it[0], lat: it[1], lng: it[2], name: it[3],
 // strict: η περιοχή σου δεν έχει κατέβει ακόμα, οπότε μόνο τα πολύ κοντινά.
 export function nearby(cat, pos, { limit = 25, strict = false } = {}) {
   const max = strict ? SHOW_NEAR : searchedWide(cat, pos) ? SHOW_MAX_WIDE : SHOW_MAX;
-  const rows = unique(areas.filter((a) => d(a, pos) < max + 45000).flatMap((a) => a.items.filter((it) => it[0] === cat)));
+  // μόνο φρέσκα δεδομένα (λιγότερο από 3 μέρες) από περιοχές κοντά σου
+  const rows = unique(areas.filter((a) => fresh(a) && d(a, pos) < max + 45000).flatMap((a) => a.items.filter((it) => it[0] === cat)));
   return rows
     .map((it) => toPlace(it, pos))
     .filter((p) => p.dist <= max)
@@ -194,7 +208,7 @@ export function nearby(cat, pos, { limit = 25, strict = false } = {}) {
 // Για τις προτάσεις όσο γράφεις: μέρη με όνομα που ταιριάζει.
 export function findByName(norm, pos, limit = 5) {
   if (!norm) return [];
-  const rows = unique(areas.filter((a) => d(a, pos) < SHOW_MAX + 45000).flatMap((a) => a.items.filter((it) => normalize(it[3]).includes(norm))));
+  const rows = unique(areas.filter((a) => fresh(a) && d(a, pos) < SHOW_MAX + 45000).flatMap((a) => a.items.filter((it) => normalize(it[3]).includes(norm))));
   return rows
     .map((it) => toPlace(it, pos))
     .filter((p) => p.dist <= SHOW_MAX)

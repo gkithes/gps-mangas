@@ -123,6 +123,7 @@ const TEXT = {
 
     "u.m": "μέτρα", "u.km": "χιλιόμετρα", "u.ft": "πόδια", "u.mi": "μίλια", "u.mShort": "μ", "u.kmShort": "χλμ",
     "u.min": "λεπ.", "u.h": "ώρ.", "u.kmh": "χλμ/ώρα", "sat.credit": "Εικόνες &copy; Esri",
+    "travel.drive": "Αυτοκίνητο", "travel.walk": "Με τα πόδια", "set.clearPoi": "🧹 Καθάρισμα αποθηκευμένων κοντινών μερών", "poi.cleared": "Καθαρίστηκαν — θα κατέβουν ξανά για εκεί που είσαι", "search.fromLink": "Από σύνδεσμο χάρτη", "search.shortLink": "Ο σύντομος σύνδεσμος δεν ανοίγει από εδώ. Στο Apple Maps πάτα το μέρος → Κοινοποίηση → Αντιγραφή, ή γράψε το όνομα/τη διεύθυνση.",
   },
 
   // ---------------------------------------------------------------- English
@@ -209,6 +210,7 @@ const TEXT = {
 
     "u.m": "meters", "u.km": "kilometers", "u.ft": "feet", "u.mi": "miles", "u.mShort": "m", "u.kmShort": "km",
     "u.min": "min", "u.h": "h", "u.kmh": "km/h", "sat.credit": "Imagery &copy; Esri",
+    "travel.drive": "Car", "travel.walk": "Walking", "set.clearPoi": "🧹 Clear saved nearby places", "poi.cleared": "Cleared — they'll download again for where you are", "search.fromLink": "From map link", "search.shortLink": "That short link can't be opened from here. In Apple Maps tap the place → Share → Copy, or type the name/address.",
   },
 
   // ---------------------------------------------------------------- Español
@@ -296,6 +298,7 @@ const TEXT = {
 
     "u.m": "metros", "u.km": "kilómetros", "u.ft": "pies", "u.mi": "millas", "u.mShort": "m", "u.kmShort": "km",
     "u.min": "min", "u.h": "h", "u.kmh": "km/h", "sat.credit": "Imágenes &copy; Esri",
+    "travel.drive": "Coche", "travel.walk": "A pie", "set.clearPoi": "🧹 Borrar lugares cercanos guardados", "poi.cleared": "Borrado — se descargarán de nuevo para donde estás", "search.fromLink": "Desde enlace de mapa", "search.shortLink": "Ese enlace corto no se puede abrir desde aquí. En Apple Maps toca el lugar → Compartir → Copiar, o escribe el nombre/la dirección.",
   },
 
   // ---------------------------------------------------------------- Français
@@ -382,6 +385,7 @@ const TEXT = {
 
     "u.m": "mètres", "u.km": "kilomètres", "u.ft": "pieds", "u.mi": "miles", "u.mShort": "m", "u.kmShort": "km",
     "u.min": "min", "u.h": "h", "u.kmh": "km/h", "sat.credit": "Images &copy; Esri",
+    "travel.drive": "Voiture", "travel.walk": "À pied", "set.clearPoi": "🧹 Effacer les lieux proches enregistrés", "poi.cleared": "Effacé — ils seront retéléchargés pour l'endroit où tu es", "search.fromLink": "Depuis un lien de carte", "search.shortLink": "Ce lien court ne s'ouvre pas d'ici. Dans Plans, touche le lieu → Partager → Copier, ou tape le nom/l'adresse.",
   },
 
   // ---------------------------------------------------------------- Deutsch
@@ -468,6 +472,7 @@ const TEXT = {
 
     "u.m": "Metern", "u.km": "Kilometern", "u.ft": "Fuß", "u.mi": "Meilen", "u.mShort": "m", "u.kmShort": "km",
     "u.min": "Min.", "u.h": "Std.", "u.kmh": "km/h", "sat.credit": "Bilder &copy; Esri",
+    "travel.drive": "Auto", "travel.walk": "Zu Fuß", "set.clearPoi": "🧹 Gespeicherte Orte in der Nähe löschen", "poi.cleared": "Gelöscht — sie werden für deinen Standort neu geladen", "search.fromLink": "Aus Kartenlink", "search.shortLink": "Dieser Kurzlink lässt sich hier nicht öffnen. In Apple Karten auf den Ort tippen → Teilen → Kopieren, oder Name/Adresse eingeben.",
   },
 
   // ---------------------------------------------------------------- Italiano
@@ -554,6 +559,7 @@ const TEXT = {
 
     "u.m": "metri", "u.km": "chilometri", "u.ft": "piedi", "u.mi": "miglia", "u.mShort": "m", "u.kmShort": "km",
     "u.min": "min", "u.h": "h", "u.kmh": "km/h", "sat.credit": "Immagini &copy; Esri",
+    "travel.drive": "Auto", "travel.walk": "A piedi", "set.clearPoi": "🧹 Cancella i luoghi vicini salvati", "poi.cleared": "Cancellati — verranno riscaricati per dove sei", "search.fromLink": "Da link della mappa", "search.shortLink": "Questo link breve non si apre da qui. In Mappe tocca il luogo → Condividi → Copia, oppure scrivi il nome/l'indirizzo.",
   },
 
   // ---------------------------------------------------------------- Português
@@ -640,5 +646,6 @@ const TEXT = {
 
     "u.m": "metros", "u.km": "quilómetros", "u.ft": "pés", "u.mi": "milhas", "u.mShort": "m", "u.kmShort": "km",
     "u.min": "min", "u.h": "h", "u.kmh": "km/h", "sat.credit": "Imagens &copy; Esri",
+    "travel.drive": "Carro", "travel.walk": "A pé", "set.clearPoi": "🧹 Limpar locais próximos guardados", "poi.cleared": "Limpo — vão ser descarregados de novo para onde estás", "search.fromLink": "De ligação de mapa", "search.shortLink": "Esta ligação curta não abre daqui. No Mapas toca no local → Partilhar → Copiar, ou escreve o nome/a morada.",
   },
 };

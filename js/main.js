@@ -49,7 +49,18 @@ startGps();
 // κοντινά για την τελευταία γνωστή θέση, πριν καν απαντήσει το GPS
 if (lastPos.value) setTimeout(() => !state.pos && POI.refresh(lastPos.value).catch(() => {}), 1500);
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+  // Όταν έρθει νέα έκδοση, ξαναφόρτωσε αμέσως (όχι στη μέση μιας διαδρομής),
+  // ώστε οι διορθώσεις να φτάνουν με το πρώτο άνοιγμα.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || reloaded || state.navigating) return;
+    reloaded = true;
+    location.reload();
+  });
+}
 
 // Για τα αυτόματα τεστ.
 window.GPSMangas = { feed, state, places };

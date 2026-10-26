@@ -143,6 +143,9 @@ body.navigating #top { display: none; }
 .panel .titles { flex: 1; min-width: 0; }
 .panel .titles small { display: block; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #preview-fav.on { color: var(--accent); }
+.travel { display: flex; gap: 6px; padding: 10px 12px 4px; }
+.travel button { flex: 1; padding: 9px; border-radius: 999px; font-size: 14px; font-weight: 700; background: var(--card-2); color: var(--muted); }
+.travel button.on { background: var(--blue); color: #fff; }
 #places-list { max-height: 42dvh; }
 #route-list { max-height: 40dvh; }
 #go { margin: 10px 12px 0; width: auto; }

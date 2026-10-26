@@ -4,15 +4,18 @@ import { SERVERS } from "./config.js";
 import { getJSON } from "./net.js";
 import { haversine } from "./util.js";
 import { t } from "./i18n.js";
+import { settings } from "./store.js";
 
-export async function fetchRoutes(from, to, alternatives = true) {
+// travel: "drive" (αυτοκίνητο) ή "walk" (με τα πόδια)
+export async function fetchRoutes(from, to, alternatives = true, travel = settings.travel) {
   const path = `${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=true&alternatives=${alternatives ? 3 : "false"}`;
-  const data = await getJSON(SERVERS.route.map((base) => base + path), {}, 10000);
+  const servers = travel === "walk" ? SERVERS.walk : SERVERS.route;
+  const data = await getJSON(servers.map((base) => base + path), {}, 10000);
   if (data.code !== "Ok" || !data.routes?.length) throw new Error(data.message || "no route");
-  return data.routes.map(parseRoute).sort((a, b) => a.duration - b.duration);
+  return data.routes.map((r) => parseRoute(r, travel)).sort((a, b) => a.duration - b.duration);
 }
 
-function parseRoute(r) {
+function parseRoute(r, travel) {
   const coords = r.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
   const classes = new Set();
   let turns = 0;
@@ -35,6 +38,7 @@ function parseRoute(r) {
     distance: r.distance,
     duration: r.duration,
     via: r.legs[0].summary || "",
+    travel,
     toll: classes.has("toll"),
     motorway: classes.has("motorway"),
     ferry: classes.has("ferry"),

@@ -5,7 +5,7 @@ import { SERVERS, SEARCH } from "./config.js";
 import { $, normalize, distTo } from "./util.js";
 import { places } from "./store.js";
 import { origin } from "./state.js";
-import { placeRow } from "./ui.js";
+import { placeRow, listMessage } from "./ui.js";
 import { shortDist } from "./format.js";
 import { getJSON } from "./net.js";
 import * as POI from "./poi.js";
@@ -65,6 +65,51 @@ async function nominatim(q, from, signal) {
   let res = from ? await run(true) : [];
   if (!res.length) res = await run(false);
   return from ? byDistance(res, from) : res;
+}
+
+// ---------- σύνδεσμοι από Apple Maps / Google Maps και συντεταγμένες ----------
+//
+// Το iPhone δεν επιτρέπει σε εφαρμογές να διαβάσουν το ιστορικό του Apple Maps.
+// Μπορείς όμως να πατήσεις «Κοινοποίηση → Αντιγραφή» σε ένα μέρος στο Apple Maps
+// και να επικολλήσεις τον σύνδεσμο εδώ: βγάζουμε το ακριβές σημείο από τον σύνδεσμο.
+
+function coords(s) {
+  const m = s && String(s).match(/^\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$/);
+  if (!m || Math.abs(+m[1]) > 90 || Math.abs(+m[2]) > 180) return null;
+  return { lat: +m[1], lng: +m[2] };
+}
+
+// { lat, lng, name, sub } αν βρέθηκε σημείο, { query } αν βρέθηκε μόνο όνομα/διεύθυνση, αλλιώς null.
+export function placeFromText(text) {
+  const raw = coords(text);
+  if (raw) return { ...raw, name: `${raw.lat.toFixed(5)}, ${raw.lng.toFixed(5)}`, sub: t("search.fromLink") };
+  const link = text.match(/https?:\/\/\S+/)?.[0];
+  if (!link) return null;
+  let u;
+  try {
+    u = new URL(link);
+  } catch {
+    return null;
+  }
+  const apple = /(^|\.)maps\.apple(\.com)?$/.test(u.hostname);
+  const google = /(^|\.)google\./.test(u.hostname) || /(^|\.)goo\.gl$/.test(u.hostname);
+  if (!apple && !google) return null;
+
+  const p = u.searchParams;
+  let c = coords(p.get("ll")) || coords(p.get("coordinate")) || coords(p.get("q")) || coords(p.get("query")) || coords(p.get("daddr")) || coords(p.get("sll"));
+  if (!c) {
+    const at = u.pathname.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || u.href.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (at) c = { lat: +at[1], lng: +at[2] };
+  }
+  const word = (v) => (v && !coords(v) ? v : "");
+  const pathName = decodeURIComponent(u.pathname.match(/\/place\/([^/@]+)/)?.[1] || "").replace(/\+/g, " ");
+  const address = p.get("address") || "";
+  const label = text.replace(link, "").trim().split("\n")[0].trim(); // κείμενο που ήρθε μαζί με τον σύνδεσμο
+  const name = p.get("name") || word(p.get("q")) || word(p.get("query")) || pathName || label || address.split(",")[0];
+  if (c) return { lat: c.lat, lng: c.lng, name: name || t("search.fromLink"), sub: address || t("search.fromLink") };
+  // σύντομος σύνδεσμος (maps.apple/p/…, maps.app.goo.gl/…): δεν ανοίγει από εδώ, ψάχνουμε το όνομα αν υπάρχει
+  const query = [name, address && address !== name ? address : ""].filter(Boolean).join(", ");
+  return query ? { query } : { query: "", short: true };
 }
 
 // ---------- «κοντά μου» ----------
@@ -198,6 +243,10 @@ $("dest").addEventListener("input", () => {
   cancel();
   if (q.length < 2) return void ($("results").innerHTML = "");
   const from = origin();
+  // επικόλλησες σύνδεσμο χάρτη ή συντεταγμένες: το σημείο αμέσως
+  const link = placeFromText(q);
+  if (link?.lat != null) return render(q, [["📍", link]], []);
+  if (link?.short) return listMessage($("results"), t("search.shortLink"), "head");
   const local = localMatches(q, from);
   render(q, local, [], { loading: true });
   timer = setTimeout(async () => {
@@ -214,12 +263,16 @@ $("dest").addEventListener("input", () => {
 
 $("search").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const q = $("dest").value.trim();
+  let q = $("dest").value.trim();
   // η μπάρα αδειάζει εντελώς μόλις πατηθεί «Πάμε»
   $("dest").value = "";
   $("dest").blur();
   cancel();
   if (!q) return;
+  const link = placeFromText(q);
+  if (link?.lat != null) return previewDestination(link);
+  if (link?.short) return listMessage($("results"), t("search.shortLink"), "head");
+  if (link?.query) q = link.query;
   const intent = nearbyIntent(q);
   if (intent?.strong) return openNearby(intent.key);
 

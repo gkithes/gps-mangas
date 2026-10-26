@@ -1,7 +1,7 @@
 // Επιλογή διαδρομής: οι εναλλακτικές στον χάρτη, κάρτα με λεπτομέρειες για κάθε μία, «Ξεκίνα».
 
 import { $, escapeHtml } from "./util.js";
-import { places } from "./store.js";
+import { places, settings, saveSettings } from "./store.js";
 import { state, origin } from "./state.js";
 import { map, layers, setMode, setDestMarker, fitPadding, toast, listMessage } from "./ui.js";
 import { duration, shortDist, clockIn } from "./format.js";
@@ -17,6 +17,7 @@ export async function previewDestination(dest) {
   $("preview-title").textContent = want.name;
   $("preview-sub").textContent = want.sub;
   renderFav();
+  renderTravel();
   $("go").disabled = true;
   layers.route.clearLayers();
   setDestMarker(want);
@@ -81,11 +82,12 @@ export function renderCards() {
     const li = document.createElement("li");
     li.className = "route" + (i === state.selected ? " sel" : "");
     const tag = i === 0 ? `<span class="tag">${t("route.fastest")}</span>` : `<span class="tag slow">${t("route.slower", { n: Math.round((r.duration - fastest) / 60) })}</span>`;
+    const car = r.travel !== "walk"; // αυτοκινητόδρομος/διόδια δεν αφορούν πεζούς
     const flags = [
       `<span>${t("route.arrive", { time: clockIn(r.duration) })}</span>`,
       `<span>${r.turns === 1 ? t("route.turn1") : t("route.turns", { n: r.turns })}</span>`,
-      `<span>${r.motorway ? t("route.motorway") : t("route.noMotorway")}</span>`,
-      r.toll ? `<span class="warn">${t("route.toll")}</span>` : `<span>${t("route.noToll")}</span>`,
+      car ? `<span>${r.motorway ? t("route.motorway") : t("route.noMotorway")}</span>` : "",
+      car ? (r.toll ? `<span class="warn">${t("route.toll")}</span>` : `<span>${t("route.noToll")}</span>`) : "",
       r.ferry ? `<span class="warn">${t("route.ferry")}</span>` : "",
     ].join("");
     li.innerHTML = `
@@ -96,6 +98,19 @@ export function renderCards() {
     ul.appendChild(li);
   });
 }
+
+// 🚗 / 🚶: αλλάζει και ξαναβρίσκει διαδρομές· το θυμάται για την επόμενη φορά.
+function renderTravel() {
+  document.querySelectorAll(".travel button").forEach((b) => b.classList.toggle("on", b.dataset.travel === settings.travel));
+}
+document.querySelectorAll(".travel button").forEach((b) => {
+  b.onclick = () => {
+    if (settings.travel === b.dataset.travel) return;
+    settings.travel = b.dataset.travel;
+    saveSettings();
+    if (state.dest) previewDestination(state.dest);
+  };
+});
 
 function renderFav() {
   const fav = !!state.dest && places.isFavorite(state.dest);

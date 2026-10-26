@@ -11,6 +11,7 @@ export const DEFAULTS = {
   uiLang: "el",     // γλώσσα εφαρμογής: el | en | es | fr | de | it | pt | auto
   units: "auto",    // auto | km | mi
   mapStyle: "map",  // map | satellite
+  travel: "drive",  // drive | walk
   voiceURI: "",
   rate: 1,
   pitch: 1,
