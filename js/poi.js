@@ -142,10 +142,12 @@ function trim(items, pos) {
   );
 }
 
-function addArea(kind, pos, items, replaceNearby = false) {
+// replace: true = σβήνει όλες τις κοντινές περιοχές, "kind" = μόνο όσες είναι του ίδιου είδους
+function addArea(kind, pos, items, replace = false) {
   const area = { kind, lat: pos.lat, lng: pos.lng, ts: Date.now(), items: trim(items, pos) };
   // ξεχνάμε τις περιοχές που είναι πολύ μακριά από εκεί που είσαι τώρα
-  const others = areas.filter((a) => d(a, pos) < FORGET_DIST && !(replaceNearby && near(a, pos)));
+  const gone = (a) => near(a, pos) && (replace === true || (replace === "kind" && a.kind === kind));
+  const others = areas.filter((a) => d(a, pos) < FORGET_DIST && !gone(a));
   areas = [area, ...others].slice(0, MAX_AREAS * 3);
   save();
 }
@@ -211,6 +213,70 @@ export async function quick(cat, pos) {
   return items.length;
 }
 
+// ---------- Photon (komoot) ----------
+// Οι διακομιστές Overpass συχνά δεν απαντούν καθόλου. Το Photon απαντάει σε ~0,2″, αλλά ψάχνει
+// με λέξεις — οπότε ρωτάμε με τη λέξη της κατηγορίας και με τα ονόματα των μεγάλων αλυσίδων.
+// Το πολύ ~6 ερωτήσεις ανά κουμπί, λίγο αραιά, για να μη μας κόψει.
+const PHOTON_HALF = 17000; // ~10 μίλια γύρω σου
+const PHOTON_WORDS = {
+  fuel: [["gas station", "amenity:fuel"], ["fuel", "amenity:fuel"], ["Shell"], ["Mobil"], ["Sunoco"], ["Cumberland Farms"]],
+  food: [["restaurant", "amenity:restaurant"], ["pizza"], ["McDonald's"], ["Burger King"], ["Wendy's"], ["Subway"]],
+  cafe: [["coffee"], ["cafe", "amenity:cafe"], ["Dunkin"], ["Starbucks"], ["Cumberland Farms"], ["Honey Dew"]],
+  market: [["supermarket", "shop:supermarket"], ["market", "shop:supermarket"], ["Stop & Shop"], ["Walmart"], ["7-Eleven"], ["CVS"]],
+  pharmacy: [["pharmacy", "amenity:pharmacy"], ["CVS"], ["Walgreens"], ["Rite Aid"]],
+  parking: [["parking", "amenity:parking"]],
+  atm: [["ATM", "amenity:atm"], ["bank", "amenity:bank"]],
+  ev: [["charging", "amenity:charging_station"], ["Tesla"], ["ChargePoint"]],
+  hotel: [["hotel", "tourism:hotel"], ["motel", "tourism:motel"], ["inn"]],
+  hospital: [["hospital", "amenity:hospital"], ["clinic", "amenity:clinic"], ["urgent care"]],
+  carwash: [["car wash", "amenity:car_wash"]],
+  repair: [["auto", "shop:car_repair"], ["tire", "shop:tyres"], ["repair", "shop:car_repair"]],
+  wc: [["toilets", "amenity:toilets"], ["restroom", "amenity:toilets"]],
+};
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function lngLatBox(pos, half) {
+  const [s, w, n, e] = bbox(pos, half).split(",");
+  return [w, s, e, n].join(",");
+}
+
+export const photonSearched = (cat, pos) => areas.some((a) => a.kind === `photon:${cat}` && fresh(a) && near(a, pos));
+
+// Ψάχνει ~10 μίλια γύρω σου· μετά από κάθε απάντηση καλεί το onPart() για να ανανεωθεί η λίστα.
+export async function photonSearch(cat, pos, onPart) {
+  const words = [...(PHOTON_WORDS[cat] || []), [catLabel(cat)]];
+  const seen = new Set();
+  const items = [];
+  let answered = 0;
+  for (const [q, tag] of words) {
+    const k = `${normalize(q)}|${tag || ""}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const params = new URLSearchParams({ q, lat: pos.lat.toFixed(5), lon: pos.lng.toFixed(5), limit: "50", bbox: lngLatBox(pos, PHOTON_HALF) });
+    if (tag) params.set("osm_tag", tag);
+    try {
+      const data = await getJSON(`${SERVERS.photon}?${params}`, {}, 6000);
+      answered++;
+      for (const f of data.features || []) {
+        const p = f.properties || {};
+        const [lng, lat] = f.geometry?.coordinates || [];
+        if (lat == null || !CATS[cat][3]({ [p.osm_key]: p.osm_value, name: p.name })) continue;
+        const name = p.name || catLabel(cat);
+        const street = [p.housenumber, p.street].filter(Boolean).join(" ");
+        const sub = [street, p.city || p.district].filter((x) => x && x !== name).join(", ");
+        items.push([cat, +lat.toFixed(6), +lng.toFixed(6), name, sub]);
+      }
+      if (items.length) {
+        addArea(`photon:${cat}`, pos, items, "kind");
+        onPart?.();
+      }
+    } catch {}
+    await pause(250);
+  }
+  if (answered && !items.length) addArea(`photon:${cat}`, pos, [], "kind"); // θυμόμαστε ότι ψάξαμε
+  return items.length;
+}
+
 // Ευρύτερη αναζήτηση για την κατηγορία (~10 μίλια· αν βρει λίγα, ~25), μία φορά ανά περιοχή.
 export const ENOUGH = 12;
 export async function searchWide(cat, pos) {
@@ -239,7 +305,7 @@ const toPlace = (it, pos) => ({ cat: it[0], lat: it[1], lng: it[2], name: it[3],
 // strict: η περιοχή σου δεν έχει κατέβει ακόμα, οπότε μόνο τα πολύ κοντινά.
 export function nearby(cat, pos, { limit = 50, strict = false } = {}) {
   // (η ευρύτερη αναζήτηση έγινε από εδώ που είσαι τώρα, οπότε μετράει πάντα)
-  const max = searchedWide(cat, pos) ? SHOW_MAX_WIDE : strict ? SHOW_NEAR : SHOW_MAX;
+  const max = searchedWide(cat, pos) || photonSearched(cat, pos) ? SHOW_MAX_WIDE : strict ? SHOW_NEAR : SHOW_MAX;
   // μόνο από περιοχές κοντά σου (τα παλιότερα από 3 μέρες ανανεώνονται στο παρασκήνιο)
   const rows = unique(areas.filter((a) => showable(a, pos) && d(a, pos) < max + 45000).flatMap((a) => a.items.filter((it) => it[0] === cat)));
   const kept = [];

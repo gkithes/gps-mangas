@@ -91,27 +91,26 @@ export async function showNearby(key) {
   let items = POI.nearby(key, from, { strict: !fresh });
   const strict = () => !POI.isFresh(from);
   // τελειώσαμε όταν έχει γίνει η αναζήτηση ως ~10 μίλια (πάρκινγκ/τουαλέτες: αρκούν και 12 κοντινά)
-  const wideNeeded = () => !POI.searchedWide(key, from) && (POI.inFull(key) || POI.nearby(key, from, { strict: strict() }).length < POI.ENOUGH);
-  const enough = !wideNeeded();
+  const count = () => POI.nearby(key, from, { strict: strict() }).length;
+  const wideNeeded = () => !POI.searchedWide(key, from) && (POI.photonSearched(key, from) ? count() < POI.ENOUGH : POI.inFull(key) || count() < POI.ENOUGH);
+  const enough = POI.photonSearched(key, from) && !wideNeeded();
   render(key, items, !fresh || !enough);
   if (fresh && enough) return;
 
-  // 2) γρήγορη απάντηση σε ~1″ όσο κατεβαίνει ολόκληρη η περιοχή:
-  //    μόνο αυτή η κατηγορία και μόνο κοντά σου (Overpass), και παράλληλα το Nominatim
+  // 2) όλα μαζί, και η λίστα ανανεώνεται με ό,τι έρχεται πρώτο:
+  //    Photon (~10 μίλια· απαντάει σχεδόν πάντα, ακόμα κι όταν οι διακομιστές Overpass όχι),
+  //    γρήγορη αναζήτηση κοντά σου (Overpass), Nominatim, και ολόκληρη η περιοχή στο παρασκήνιο
   let finished = false;
   const early = () => stillHere() && !finished && render(key, POI.nearby(key, from, { strict: strict() }), true);
-  const quickOnes = () => Promise.all([POI.fast(key, from), POI.quick(key, from)].map((p) => p.then(early).catch(() => {})));
   // (πάρκινγκ/τουαλέτες δεν είναι στο κατέβασμα της περιοχής, οπότε πάντα γρήγορη αναζήτηση)
-  const quick = fresh && POI.inFull(key) ? Promise.resolve() : quickOnes();
-
-  // 3) ολόκληρη η περιοχή, 4) αν είναι ακόμα λίγα, πιο μακριά
-  //    (η ευρύτερη γίνεται ακόμα κι αν το κατέβασμα της περιοχής απέτυχε)
-  try {
-    if (!fresh) await POI.refresh(from, { force: true });
-    else await quick;
-  } catch {
-    await quick;
-  }
+  const needQuick = !fresh || !POI.inFull(key);
+  const fastP = needQuick ? POI.fast(key, from).then(early).catch(() => {}) : null;
+  const nomP = needQuick ? POI.quick(key, from).then(early).catch(() => {}) : null;
+  const photonP = POI.photonSearched(key, from) ? null : POI.photonSearch(key, from, early).catch(() => {});
+  const areaP = fresh ? null : POI.refresh(from, { force: true }).catch(() => {});
+  await photonP;
+  // αν το Photon έφερε αρκετά, τελειώσαμε — τα υπόλοιπα συνεχίζουν αθόρυβα στο παρασκήνιο
+  if (!(POI.photonSearched(key, from) && count() >= POI.ENOUGH)) await Promise.all([fastP, nomP, areaP]);
   if (!stillHere()) return;
   if (wideNeeded()) {
     render(key, POI.nearby(key, from, { strict: strict() }), true);
