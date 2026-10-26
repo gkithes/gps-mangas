@@ -26,8 +26,11 @@ const FORGET_DIST = 150000;        // περιοχές πιο μακριά απ�
 // Καφέ = και τα «fast food» που είναι καφές/ντόνατς (Dunkin', Starbucks, Tim Hortons…):
 // στον χάρτη τα περισσότερα είναι καταχωρημένα ως fast food, όχι ως café.
 const COFFEE_BRANDS = /dunkin|starbucks|tim hortons|peet'?s|caribou|costa|gregorys|dutch bros|coffee|caf[eé]|espresso|donut|doughnut/i;
+// …και τα βενζινάδικα / μίνι μάρκετ που είναι γνωστά για τον καφέ τους.
+const COFFEE_STOPS = /cumberland farms|wawa|7-?eleven|7 eleven|sheetz|quiktrip|\bqt\b|kwik trip|casey'?s|royal farms|stewart'?s|honey dew|circle k|speedway|pret|tim hortons/i;
 function isCoffee(t) {
   if (t.amenity === "cafe" || t.shop === "coffee") return true;
+  if (t.amenity === "fuel" || t.shop === "convenience") return COFFEE_STOPS.test(`${t.brand || ""} ${t.name || ""}`);
   if (t.amenity !== "fast_food") return false;
   return /coffee|donut|doughnut/i.test(t.cuisine || "") || COFFEE_BRANDS.test(t.brand || t.name || "");
 }
@@ -40,7 +43,7 @@ export const CATS = {
   fuel: ["Βενζίνη", "⛽", ['["amenity"="fuel"]'], (t) => t.amenity === "fuel", "fuel"],
   food: ["Φαγητό", "🍽", ['["amenity"~"^(restaurant|fast_food)$"]'], (t) => /^(restaurant|fast_food)$/.test(t.amenity), "restaurant"],
   // απλά φίλτρα στον διακομιστή (τα σύνθετα αργούν ή απορρίπτονται)· ποια fast food είναι καφές το κρίνει το κινητό
-  cafe: ["Καφές", "☕", ['["amenity"="cafe"]', '["shop"="coffee"]', '["amenity"="fast_food"]'], isCoffee, "cafe"],
+  cafe: ["Καφές", "☕", ['["amenity"="cafe"]', '["shop"="coffee"]', '["amenity"="fast_food"]', '["amenity"="fuel"]', '["shop"="convenience"]'], isCoffee, "cafe"],
   market: ["Σούπερ μάρκετ", "🛒", ['["shop"~"^(supermarket|convenience)$"]'], (t) => /^(supermarket|convenience)$/.test(t.shop), "supermarket"],
   pharmacy: ["Φαρμακείο", "💊", ['["amenity"="pharmacy"]'], (t) => t.amenity === "pharmacy", "pharmacy"],
   parking: ["Πάρκινγκ", "🅿️", ['["amenity"="parking"]["access"!~"^(private|no|customers)$"]'], (t) => t.amenity === "parking", "parking"],
@@ -208,12 +211,13 @@ export async function quick(cat, pos) {
   return items.length;
 }
 
-// Λίγα αποτελέσματα (εξοχή): μία ευρύτερη αναζήτηση για την κατηγορία, και τη θυμόμαστε.
+// Λίγα αποτελέσματα: μία ευρύτερη αναζήτηση για την κατηγορία (~6 μίλια, μετά ~15), και τη θυμόμαστε.
+export const ENOUGH = 12;
 export async function searchWide(cat, pos) {
   let items = [];
-  for (const half of [15000, 40000]) {
+  for (const half of [10000, 25000]) {
     items = await overpass([cat], pos, half, { hedge: 3000 });
-    if (items.length >= 3) break;
+    if (items.length >= ENOUGH) break;
   }
   addArea(`wide:${cat}`, pos, items); // και άδειο, για να μην ξαναψάχνει σε κάθε πάτημα
 }
@@ -234,14 +238,18 @@ const toPlace = (it, pos) => ({ cat: it[0], lat: it[1], lng: it[2], name: it[3],
 // Μόνο μέρη που είναι πραγματικά κοντά σου τώρα — όχι από περιοχές που πέρασες παλιότερα.
 // strict: η περιοχή σου δεν έχει κατέβει ακόμα, οπότε μόνο τα πολύ κοντινά.
 export function nearby(cat, pos, { limit = 25, strict = false } = {}) {
-  const max = strict ? SHOW_NEAR : searchedWide(cat, pos) ? SHOW_MAX_WIDE : SHOW_MAX;
+  // (η ευρύτερη αναζήτηση έγινε από εδώ που είσαι τώρα, οπότε μετράει πάντα)
+  const max = searchedWide(cat, pos) ? SHOW_MAX_WIDE : strict ? SHOW_NEAR : SHOW_MAX;
   // μόνο από περιοχές κοντά σου (τα παλιότερα από 3 μέρες ανανεώνονται στο παρασκήνιο)
   const rows = unique(areas.filter((a) => showable(a, pos) && d(a, pos) < max + 45000).flatMap((a) => a.items.filter((it) => it[0] === cat)));
-  return rows
-    .map((it) => toPlace(it, pos))
-    .filter((p) => p.dist <= max)
-    .sort((a, b) => a.dist - b.dist)
-    .slice(0, limit);
+  const kept = [];
+  for (const p of rows.map((it) => toPlace(it, pos)).filter((p) => p.dist <= max).sort((a, b) => a.dist - b.dist)) {
+    // το ίδιο μαγαζί δύο φορές (π.χ. βενζινάδικο + μίνι μάρκετ στο ίδιο σημείο)
+    if (kept.some((k) => normalize(k.name) === normalize(p.name) && haversine([k.lat, k.lng], [p.lat, p.lng]) < 80)) continue;
+    kept.push(p);
+    if (kept.length >= limit) break;
+  }
+  return kept;
 }
 
 // Για τις προτάσεις όσο γράφεις: μέρη με όνομα που ταιριάζει.

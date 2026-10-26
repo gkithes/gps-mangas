@@ -89,7 +89,7 @@ export async function showNearby(key) {
   // 1) αμέσως ό,τι υπάρχει στο κινητό (αν η περιοχή δεν έχει κατέβει, μόνο τα πολύ κοντινά)
   const fresh = POI.isFresh(from);
   let items = POI.nearby(key, from, { strict: !fresh });
-  const enough = items.length >= 3 || POI.searchedWide(key, from);
+  const enough = items.length >= POI.ENOUGH || POI.searchedWide(key, from);
   render(key, items, !fresh || !enough);
   if (fresh && enough) return;
 
@@ -103,16 +103,17 @@ export async function showNearby(key) {
   const quick = fresh && POI.inFull(key) ? Promise.resolve() : quickOnes();
 
   // 3) ολόκληρη η περιοχή, 4) αν είναι ακόμα λίγα, πιο μακριά
+  //    (η ευρύτερη γίνεται ακόμα κι αν το κατέβασμα της περιοχής απέτυχε)
   try {
     if (!fresh) await POI.refresh(from, { force: true });
     else await quick;
-    if (!stillHere()) return;
-    if (POI.nearby(key, from).length < 3 && !POI.searchedWide(key, from)) {
-      render(key, POI.nearby(key, from), true);
-      await POI.searchWide(key, from);
-    }
   } catch {
     await quick;
+  }
+  if (!stillHere()) return;
+  if (POI.nearby(key, from, { strict: strict() }).length < POI.ENOUGH && !POI.searchedWide(key, from)) {
+    render(key, POI.nearby(key, from, { strict: strict() }), true);
+    await POI.searchWide(key, from).catch(() => {});
   }
   if (!stillHere()) return;
   // τίποτα ακόμα; μία τελευταία γρήγορη προσπάθεια πριν πούμε «δεν βρέθηκε»
