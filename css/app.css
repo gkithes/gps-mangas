@@ -115,6 +115,8 @@ body.navigating #top { display: none; }
 .search-go { padding: 10px 16px; border-radius: 999px; font-weight: 700; background: var(--accent); color: var(--accent-ink); }
 #results { margin-top: 8px; max-height: 45dvh; }
 #results:empty { display: none; }
+.install-tip { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; padding: 12px 12px 12px 14px; font-size: 14px; line-height: 1.4; }
+.install-tip p { margin: 4px 0 0; color: var(--muted); }
 .locate { display: block; margin: 8px auto 0; padding: 9px 14px; border-radius: 999px; font-size: 14px; font-weight: 700; background: var(--danger); color: #fff; box-shadow: var(--shadow); }
 
 /* ---------- κάτω: κοντινά, πρόσφατα, κάρτες ---------- */

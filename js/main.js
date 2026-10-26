@@ -1,6 +1,6 @@
 // Εκκίνηση: συνδέει όλα τα κομμάτια.
 
-import { onError } from "./util.js";
+import { $, onError, loadJSON, saveJSON } from "./util.js";
 import { applyStatic, t } from "./i18n.js";
 import { lastPos, places } from "./store.js";
 import { state } from "./state.js";
@@ -42,6 +42,16 @@ onPosition((pos) => {
 });
 
 applyStatic(); // κείμενα της σελίδας στη γλώσσα της εφαρμογής
+
+// Μέσα στο Safari η μπάρα του Safari κρύβει μέρος της οθόνης. Μόνο από το εικονίδιο
+// της αρχικής οθόνης η εφαρμογή γεμίζει όλη την οθόνη — δείχνουμε πώς, μία φορά.
+const iOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches;
+if (iOS && !standalone && !loadJSON("gps-mangas-install-tip-closed", false)) $("install-tip").hidden = false;
+$("install-close").onclick = () => {
+  $("install-tip").hidden = true;
+  saveJSON("gps-mangas-install-tip-closed", true);
+};
 loadRecordings();
 setMode("home");
 renderDrawer();
