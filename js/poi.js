@@ -39,7 +39,8 @@ export const catLabel = (cat) => t(`cat.${cat}`);
 export const CATS = {
   fuel: ["Βενζίνη", "⛽", ['["amenity"="fuel"]'], (t) => t.amenity === "fuel", "fuel"],
   food: ["Φαγητό", "🍽", ['["amenity"~"^(restaurant|fast_food)$"]'], (t) => /^(restaurant|fast_food)$/.test(t.amenity), "restaurant"],
-  cafe: ["Καφές", "☕", ['["amenity"="cafe"]', '["shop"="coffee"]', '["amenity"="fast_food"]["cuisine"~"coffee|donut",i]', '["amenity"="fast_food"]["brand"~"dunkin|starbucks|tim hortons|peet|caribou|costa|gregorys|dutch bros",i]'], isCoffee, "cafe"],
+  // απλά φίλτρα στον διακομιστή (τα σύνθετα αργούν ή απορρίπτονται)· ποια fast food είναι καφές το κρίνει το κινητό
+  cafe: ["Καφές", "☕", ['["amenity"="cafe"]', '["shop"="coffee"]', '["amenity"="fast_food"]'], isCoffee, "cafe"],
   market: ["Σούπερ μάρκετ", "🛒", ['["shop"~"^(supermarket|convenience)$"]'], (t) => /^(supermarket|convenience)$/.test(t.shop), "supermarket"],
   pharmacy: ["Φαρμακείο", "💊", ['["amenity"="pharmacy"]'], (t) => t.amenity === "pharmacy", "pharmacy"],
   parking: ["Πάρκινγκ", "🅿️", ['["amenity"="parking"]["access"!~"^(private|no|customers)$"]'], (t) => t.amenity === "parking", "parking"],
@@ -51,6 +52,11 @@ export const CATS = {
   repair: ["Συνεργείο", "🔧", ['["shop"~"^(car_repair|tyres)$"]'], (t) => /^(car_repair|tyres)$/.test(t.shop), "car repair"],
   wc: ["Τουαλέτα", "🚻", ['["amenity"="toilets"]'], (t) => t.amenity === "toilets", "toilets"],
 };
+
+// Αυτές δεν μπαίνουν στο κατέβασμα όλης της περιοχής (είναι πάρα πολλές και το κάνουν αργό)·
+// έρχονται με τη γρήγορη αναζήτηση όταν πατήσεις το κουμπί τους.
+const ON_DEMAND = new Set(["parking", "wc"]);
+export const inFull = (cat) => !ON_DEMAND.has(cat);
 
 // Κάθε περιοχή: { lat, lng, ts, kind: "full" | "wide:<cat>" | "quick", items: [[cat, lat, lng, name, sub]] }
 // Αλλάζει όταν πρέπει να σβηστούν τα παλιά αποθηκευμένα (π.χ. μετά από διόρθωση).
@@ -152,7 +158,7 @@ export function refresh(pos, { force = false } = {}) {
   if (inflight) return inflight;
   if (!force && (isFresh(pos) || Date.now() - lastFail < RETRY_AFTER)) return Promise.resolve(false);
   const center = { lat: pos.lat, lng: pos.lng };
-  inflight = overpass(Object.keys(CATS), center, HALF)
+  inflight = overpass(Object.keys(CATS).filter(inFull), center, HALF)
     .then((items) => {
       addArea("full", center, items, true);
       return true;
@@ -167,7 +173,9 @@ export function refresh(pos, { force = false } = {}) {
 
 // Γρήγορη απάντηση σε ~1″: μόνο αυτή η κατηγορία, μόνο κοντά σου — μικρό αίτημα, απαντάει αμέσως.
 export async function fast(cat, pos) {
-  const items = await overpass([cat], pos, FAST_HALF, { limit: 120, hedge: 800, timeout: 8000 });
+  const ask = () => overpass([cat], pos, FAST_HALF, { limit: 400, hedge: 800, timeout: 8000 });
+  // αν όλοι οι διακομιστές είναι απασχολημένοι (συμβαίνει αμέσως μετά το άνοιγμα), μία ακόμα προσπάθεια σε 1,5″
+  const items = await ask().catch(() => new Promise((r) => setTimeout(r, 1500)).then(ask));
   if (items.length) addArea("quick", pos, items);
   return items.length;
 }
@@ -181,10 +189,13 @@ export async function quick(cat, pos) {
   });
   let data = await getJSON(`${SERVERS.nominatim}?${params}`, {}, 8000);
   if (cat === "cafe") {
-    params.set("q", "coffee");
-    try {
-      data = [...(data || []), ...((await getJSON(`${SERVERS.nominatim}?${params}`, {}, 8000)) || [])];
-    } catch {}
+    // ο καφές στην Αμερική είναι κυρίως αλυσίδες καταχωρημένες ως fast food
+    for (const q of ["Dunkin", "coffee", "Starbucks"]) {
+      params.set("q", q);
+      try {
+        data = [...(data || []), ...((await getJSON(`${SERVERS.nominatim}?${params}`, {}, 8000)) || [])];
+      } catch {}
+    }
   }
   const items = [];
   for (const r of data || []) {

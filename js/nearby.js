@@ -96,12 +96,16 @@ export async function showNearby(key) {
   // 2) γρήγορη απάντηση σε ~1″ όσο κατεβαίνει ολόκληρη η περιοχή:
   //    μόνο αυτή η κατηγορία και μόνο κοντά σου (Overpass), και παράλληλα το Nominatim
   let finished = false;
-  const early = () => stillHere() && !finished && !POI.isFresh(from) && render(key, POI.nearby(key, from, { strict: true }), true);
-  const quick = fresh ? Promise.resolve() : Promise.all([POI.fast(key, from), POI.quick(key, from)].map((p) => p.then(early).catch(() => {})));
+  const strict = () => !POI.isFresh(from);
+  const early = () => stillHere() && !finished && render(key, POI.nearby(key, from, { strict: strict() }), true);
+  const quickOnes = () => Promise.all([POI.fast(key, from), POI.quick(key, from)].map((p) => p.then(early).catch(() => {})));
+  // (πάρκινγκ/τουαλέτες δεν είναι στο κατέβασμα της περιοχής, οπότε πάντα γρήγορη αναζήτηση)
+  const quick = fresh && POI.inFull(key) ? Promise.resolve() : quickOnes();
 
   // 3) ολόκληρη η περιοχή, 4) αν είναι ακόμα λίγα, πιο μακριά
   try {
     if (!fresh) await POI.refresh(from, { force: true });
+    else await quick;
     if (!stillHere()) return;
     if (POI.nearby(key, from).length < 3 && !POI.searchedWide(key, from)) {
       render(key, POI.nearby(key, from), true);
@@ -110,9 +114,12 @@ export async function showNearby(key) {
   } catch {
     await quick;
   }
+  if (!stillHere()) return;
+  // τίποτα ακόμα; μία τελευταία γρήγορη προσπάθεια πριν πούμε «δεν βρέθηκε»
+  if (!POI.nearby(key, from, { strict: strict() }).length) await POI.fast(key, from).catch(() => {});
   finished = true;
   if (!stillHere()) return;
-  items = POI.nearby(key, from, { strict: !POI.isFresh(from) });
+  items = POI.nearby(key, from, { strict: strict() });
   if (items.length) render(key, items, false);
   else listMessage($("places-list"), t("near.failed"));
 }
