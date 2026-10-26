@@ -15,8 +15,18 @@ const player = new Audio();
 player.playsInline = true;
 const hasSpeech = "speechSynthesis" in window;
 
+// Όπως τα κανονικά GPS: όσο μιλάει, η μουσική / το ράδιο χαμηλώνει (ή σταματάει) και μετά
+// επανέρχεται. Ο ήχος πάει όπου πάει και η μουσική — Bluetooth, CarPlay, ηχεία.
+// (Safari 17+ στο iPhone· σε παλιότερα απλώς δεν κάνει τίποτα.)
+function audioFocus() {
+  try {
+    if (navigator.audioSession) navigator.audioSession.type = settings.others === "pause" ? "transient-solo" : "transient";
+  } catch {}
+}
+
 // Το iPhone παίζει ήχο μόνο αφού αγγίξεις κάτι: ξεκλείδωμα με το πρώτο άγγιγμα.
 function unlock() {
+  audioFocus();
   try {
     audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
     audioCtx.resume();
@@ -126,6 +136,7 @@ function pump() {
   try {
     speechSynthesis.resume(); // ξεκολλάει τη φωνή μετά από κλήση, Siri κ.λπ.
   } catch {}
+  audioFocus();
   chime();
   const u = new SpeechSynthesisUtterance(item.text);
   const v = voiceFor(item.code);
@@ -151,6 +162,7 @@ function pump() {
 export function playClip(clip, interrupt = true) {
   if (settings.mode === "mute") return;
   if (interrupt) stopSound();
+  audioFocus();
   chime();
   if (player.dataset.url) URL.revokeObjectURL(player.dataset.url);
   const url = URL.createObjectURL(clip.blob);

@@ -87,6 +87,7 @@ bind("s-volume", "volume", { output: "o-volume", parse: Number, format: (v) => M
 const showMode = bind("s-mode", "mode", { onChange: renderMute });
 bind("s-lang", "lang");
 bind("s-chime", "chime");
+bind("s-others", "others");
 bind("s-myaudio", "myAudio");
 renderMute();
 

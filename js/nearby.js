@@ -89,14 +89,16 @@ export async function showNearby(key) {
   // 1) αμέσως ό,τι υπάρχει στο κινητό (αν η περιοχή δεν έχει κατέβει, μόνο τα πολύ κοντινά)
   const fresh = POI.isFresh(from);
   let items = POI.nearby(key, from, { strict: !fresh });
-  const enough = items.length >= POI.ENOUGH || POI.searchedWide(key, from);
+  const strict = () => !POI.isFresh(from);
+  // τελειώσαμε όταν έχει γίνει η αναζήτηση ως ~10 μίλια (πάρκινγκ/τουαλέτες: αρκούν και 12 κοντινά)
+  const wideNeeded = () => !POI.searchedWide(key, from) && (POI.inFull(key) || POI.nearby(key, from, { strict: strict() }).length < POI.ENOUGH);
+  const enough = !wideNeeded();
   render(key, items, !fresh || !enough);
   if (fresh && enough) return;
 
   // 2) γρήγορη απάντηση σε ~1″ όσο κατεβαίνει ολόκληρη η περιοχή:
   //    μόνο αυτή η κατηγορία και μόνο κοντά σου (Overpass), και παράλληλα το Nominatim
   let finished = false;
-  const strict = () => !POI.isFresh(from);
   const early = () => stillHere() && !finished && render(key, POI.nearby(key, from, { strict: strict() }), true);
   const quickOnes = () => Promise.all([POI.fast(key, from), POI.quick(key, from)].map((p) => p.then(early).catch(() => {})));
   // (πάρκινγκ/τουαλέτες δεν είναι στο κατέβασμα της περιοχής, οπότε πάντα γρήγορη αναζήτηση)
@@ -111,7 +113,7 @@ export async function showNearby(key) {
     await quick;
   }
   if (!stillHere()) return;
-  if (POI.nearby(key, from, { strict: strict() }).length < POI.ENOUGH && !POI.searchedWide(key, from)) {
+  if (wideNeeded()) {
     render(key, POI.nearby(key, from, { strict: strict() }), true);
     await POI.searchWide(key, from).catch(() => {});
   }

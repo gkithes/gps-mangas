@@ -20,6 +20,7 @@ export const DEFAULTS = {
   mode: "both",     // both | quips | plain | mute
   lang: "en",       // γλώσσα ατάκων: en | el | pnt | mix | …
   chime: true,
+  others: "duck",   // άλλος ήχος (μουσική, ράδιο) όσο μιλάει: duck = χαμηλώνει | pause = σταματάει
   speedLimit: 120,  // πάντα σε χλμ/ώρα
   myAudio: "mix",   // mix | only | off
   drawerOpen: false,

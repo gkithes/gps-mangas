@@ -206,6 +206,13 @@
         <label class="row"><span data-i18n="set.chime">Ήχος «ντινγκ» πριν από κάθε οδηγία</span>
           <input id="s-chime" type="checkbox">
         </label>
+        <label><span data-i18n="set.others">Μουσική / ράδιο όσο μιλάει</span>
+          <select id="s-others">
+            <option value="duck" data-i18n="others.duck">Χαμηλώνει</option>
+            <option value="pause" data-i18n="others.pause">Σταματάει και ξαναρχίζει</option>
+          </select>
+        </label>
+        <p class="hint" data-i18n="others.hint">Στο αυτοκίνητο η φωνή βγαίνει από το ηχοσύστημα μέσω Bluetooth ή CarPlay, όπως και η μουσική.</p>
         <label><span data-i18n="set.speed">Προειδοποίηση ταχύτητας πάνω από</span> <output id="o-speed"></output>
           <input id="s-speed" type="range" min="50" max="160" step="10">
         </label>

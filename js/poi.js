@@ -112,7 +112,7 @@ function bbox(pos, half) {
 // Ρωτάμε τον πρώτο διακομιστή· αν αργεί, και τον επόμενο ταυτόχρονα (κερδίζει ο πιο γρήγορος).
 async function overpass(cats, pos, half, { limit = "", hedge = 4000, timeout = 15000 } = {}) {
   const parts = cats.flatMap((c) => CATS[c][2]).map((f) => `nwr${f};`).join("");
-  const q = `[out:json][timeout:20][bbox:${bbox(pos, half)}];(${parts});out center ${limit};`;
+  const q = `[out:json][timeout:25][bbox:${bbox(pos, half)}];(${parts});out center ${limit};`;
   const data = await getJSON(SERVERS.overpass, { method: "POST", body: new URLSearchParams({ data: q }) }, timeout, hedge);
   const items = [];
   for (const el of data.elements || []) {
@@ -211,12 +211,12 @@ export async function quick(cat, pos) {
   return items.length;
 }
 
-// Λίγα αποτελέσματα: μία ευρύτερη αναζήτηση για την κατηγορία (~6 μίλια, μετά ~15), και τη θυμόμαστε.
+// Ευρύτερη αναζήτηση για την κατηγορία (~10 μίλια· αν βρει λίγα, ~25), μία φορά ανά περιοχή.
 export const ENOUGH = 12;
 export async function searchWide(cat, pos) {
   let items = [];
-  for (const half of [10000, 25000]) {
-    items = await overpass([cat], pos, half, { hedge: 3000 });
+  for (const half of [17000, 40000]) {
+    items = await overpass([cat], pos, half, { hedge: 5000, timeout: 25000 });
     if (items.length >= ENOUGH) break;
   }
   addArea(`wide:${cat}`, pos, items); // και άδειο, για να μην ξαναψάχνει σε κάθε πάτημα
@@ -237,7 +237,7 @@ const toPlace = (it, pos) => ({ cat: it[0], lat: it[1], lng: it[2], name: it[3],
 // Άμεσα, από τη μνήμη του κινητού, πιο κοντινά πρώτα.
 // Μόνο μέρη που είναι πραγματικά κοντά σου τώρα — όχι από περιοχές που πέρασες παλιότερα.
 // strict: η περιοχή σου δεν έχει κατέβει ακόμα, οπότε μόνο τα πολύ κοντινά.
-export function nearby(cat, pos, { limit = 25, strict = false } = {}) {
+export function nearby(cat, pos, { limit = 50, strict = false } = {}) {
   // (η ευρύτερη αναζήτηση έγινε από εδώ που είσαι τώρα, οπότε μετράει πάντα)
   const max = searchedWide(cat, pos) ? SHOW_MAX_WIDE : strict ? SHOW_NEAR : SHOW_MAX;
   // μόνο από περιοχές κοντά σου (τα παλιότερα από 3 μέρες ανανεώνονται στο παρασκήνιο)

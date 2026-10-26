@@ -1,7 +1,7 @@
 // Service worker: η εφαρμογή ανοίγει αμέσως από τη μνήμη του κινητού και ενημερώνεται
 // στο παρασκήνιο. Κρατάει και τα κομμάτια του χάρτη που έχεις δει.
 
-const VERSION = "v2.7.3"; // ίδιο με το APP_VERSION στο js/config.js
+const VERSION = "v2.8.0"; // ίδιο με το APP_VERSION στο js/config.js
 const APP = `gps-mangas-app-${VERSION}`;
 const TILES = "gps-mangas-tiles";
 const MAX_TILES = 1500;

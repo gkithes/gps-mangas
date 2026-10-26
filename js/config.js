@@ -1,6 +1,6 @@
 // Ρυθμίσεις που δεν αλλάζει ο χρήστης: διακομιστές και όρια της πλοήγησης.
 
-export const APP_VERSION = "v2.7.3"; // ίδιο με το VERSION στο sw.js
+export const APP_VERSION = "v2.8.0"; // ίδιο με το VERSION στο sw.js
 
 export const SERVERS = {
   route: [
