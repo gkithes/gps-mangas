@@ -53,10 +53,11 @@ function render(key, items, loading) {
 }
 
 // Αν η λίστα είναι ανοιχτή και μετακινηθείς πάνω από ~250 μ, ξαναβγαίνει από τη νέα θέση.
-let shown = null; // { key, lat, lng }
+// (και μόλις έρθει το πρώτο GPS, αν η λίστα βγήκε από την τελευταία γνωστή θέση)
+let shown = null; // { key, lat, lng, approx }
 export function nearbyFollow(pos) {
   if (state.mode !== "places" || !shown || state.navigating) return;
-  if (haversine([shown.lat, shown.lng], [pos.lat, pos.lng]) > 250) showNearby(shown.key);
+  if (shown.approx || haversine([shown.lat, shown.lng], [pos.lat, pos.lng]) > 250) showNearby(shown.key);
 }
 
 export async function showNearby(key) {
@@ -70,15 +71,20 @@ export async function showNearby(key) {
   $("places-panel").dataset.key = key; // χρώμα της κατηγορίας στην κεφαλίδα
 
   const stillHere = () => state.mode === "places" && button.classList.contains("on");
-  // πρώτα πού είσαι ΤΩΡΑ (όχι πού ήσουν πριν από λίγα λεπτά)
+  // Πού είσαι: δείχνουμε αμέσως από την πιο πρόσφατη θέση που ξέρουμε και ζητάμε καινούργια
+  // στο παρασκήνιο — αν έχεις μετακινηθεί, η λίστα ξαναβγαίνει μόνη της (nearbyFollow).
+  // Περιμένουμε το GPS μόνο αν δεν ξέρουμε καθόλου πού είσαι.
   if (!state.pos || Date.now() - state.lastFix > 30000) {
-    listMessage($("places-list"), t("near.findingYou"), "loading");
-    await freshPosition();
-    if (!stillHere()) return;
+    if (origin()) freshPosition();
+    else {
+      listMessage($("places-list"), t("near.findingYou"), "loading");
+      await freshPosition();
+      if (!stillHere()) return;
+    }
   }
   const from = origin();
   if (!from) return listMessage($("places-list"), t("near.noLocation"));
-  shown = { key, lat: from.lat, lng: from.lng };
+  shown = { key, lat: from.lat, lng: from.lng, approx: !state.pos };
 
   // 1) αμέσως ό,τι υπάρχει στο κινητό (αν η περιοχή δεν έχει κατέβει, μόνο τα πολύ κοντινά)
   const fresh = POI.isFresh(from);
@@ -87,12 +93,11 @@ export async function showNearby(key) {
   render(key, items, !fresh || !enough);
   if (fresh && enough) return;
 
-  // 2) γρήγορη απάντηση σε ~1″ όσο κατεβαίνει ολόκληρη η περιοχή
-  const quick = fresh
-    ? Promise.resolve()
-    : POI.quick(key, from)
-        .then(() => stillHere() && !POI.isFresh(from) && render(key, POI.nearby(key, from, { strict: true }), true))
-        .catch(() => {});
+  // 2) γρήγορη απάντηση σε ~1″ όσο κατεβαίνει ολόκληρη η περιοχή:
+  //    μόνο αυτή η κατηγορία και μόνο κοντά σου (Overpass), και παράλληλα το Nominatim
+  let finished = false;
+  const early = () => stillHere() && !finished && !POI.isFresh(from) && render(key, POI.nearby(key, from, { strict: true }), true);
+  const quick = fresh ? Promise.resolve() : Promise.all([POI.fast(key, from), POI.quick(key, from)].map((p) => p.then(early).catch(() => {})));
 
   // 3) ολόκληρη η περιοχή, 4) αν είναι ακόμα λίγα, πιο μακριά
   try {
@@ -105,8 +110,9 @@ export async function showNearby(key) {
   } catch {
     await quick;
   }
+  finished = true;
   if (!stillHere()) return;
-  items = POI.nearby(key, from);
+  items = POI.nearby(key, from, { strict: !POI.isFresh(from) });
   if (items.length) render(key, items, false);
   else listMessage($("places-list"), t("near.failed"));
 }

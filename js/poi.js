@@ -13,6 +13,8 @@ const KEY = "gps-mangas-poi";
 const HALF = 5000;                 // μισό πλάτος του τετραγώνου κάθε περιοχής (μέτρα)
 const REFRESH_DIST = 2500;         // ξανακατέβασμα όταν απομακρυνθείς τόσο από το κέντρο της
 const MAX_AGE = 3 * 24 * 3600e3;   // ανανέωση κάθε 3 μέρες
+const SHOW_AGE = 30 * 24 * 3600e3; // …αλλά μέχρι να έρθουν τα νέα δείχνουμε και παλιότερα (τα μαγαζιά σπάνια αλλάζουν)
+const FAST_HALF = 3000;            // γρήγορη αναζήτηση μίας κατηγορίας: τετράγωνο 6×6 χλμ
 const RETRY_AFTER = 60e3;          // μετά από αποτυχία, ξαναδοκιμή σε 1 λεπτό
 const MAX_AREAS = 5;
 const PER_CAT = 150;               // πόσα κρατάμε ανά κατηγορία και περιοχή
@@ -78,6 +80,8 @@ function save() {
 const d = (a, b) => haversine([a.lat, a.lng], [b.lat, b.lng]);
 const near = (a, pos) => d(a, pos) < REFRESH_DIST;
 const fresh = (a) => Date.now() - a.ts < MAX_AGE;
+// παλιότερα από 3 μέρες μόνο αν είναι από το ίδιο σημείο που είσαι τώρα (όχι από εκεί που ήσουν)
+const showable = (a, pos) => fresh(a) || (Date.now() - a.ts < SHOW_AGE && near(a, pos));
 
 function describe(tags, name) {
   const bits = [];
@@ -96,10 +100,11 @@ function bbox(pos, half) {
   return [pos.lat - dLat, pos.lng - dLng, pos.lat + dLat, pos.lng + dLng].map((x) => x.toFixed(5)).join(",");
 }
 
-async function overpass(cats, pos, half) {
+// Ρωτάμε τον πρώτο διακομιστή· αν αργεί, και τον επόμενο ταυτόχρονα (κερδίζει ο πιο γρήγορος).
+async function overpass(cats, pos, half, { limit = "", hedge = 4000, timeout = 15000 } = {}) {
   const parts = cats.flatMap((c) => CATS[c][2]).map((f) => `nwr${f};`).join("");
-  const q = `[out:json][timeout:20][bbox:${bbox(pos, half)}];(${parts});out center;`;
-  const data = await getJSON(SERVERS.overpass, { method: "POST", body: new URLSearchParams({ data: q }) }, 15000);
+  const q = `[out:json][timeout:20][bbox:${bbox(pos, half)}];(${parts});out center ${limit};`;
+  const data = await getJSON(SERVERS.overpass, { method: "POST", body: new URLSearchParams({ data: q }) }, timeout, hedge);
   const items = [];
   for (const el of data.elements || []) {
     const lat = el.lat ?? el.center?.lat;
@@ -160,6 +165,13 @@ export function refresh(pos, { force = false } = {}) {
   return inflight;
 }
 
+// Γρήγορη απάντηση σε ~1″: μόνο αυτή η κατηγορία, μόνο κοντά σου — μικρό αίτημα, απαντάει αμέσως.
+export async function fast(cat, pos) {
+  const items = await overpass([cat], pos, FAST_HALF, { limit: 120, hedge: 800, timeout: 8000 });
+  if (items.length) addArea("quick", pos, items);
+  return items.length;
+}
+
 // Γρήγορη απάντηση από το Nominatim (~13 χλμ γύρω σου).
 export async function quick(cat, pos) {
   const deg = 0.12;
@@ -189,7 +201,7 @@ export async function quick(cat, pos) {
 export async function searchWide(cat, pos) {
   let items = [];
   for (const half of [15000, 40000]) {
-    items = await overpass([cat], pos, half);
+    items = await overpass([cat], pos, half, { hedge: 3000 });
     if (items.length >= 3) break;
   }
   addArea(`wide:${cat}`, pos, items); // και άδειο, για να μην ξαναψάχνει σε κάθε πάτημα
@@ -212,8 +224,8 @@ const toPlace = (it, pos) => ({ cat: it[0], lat: it[1], lng: it[2], name: it[3],
 // strict: η περιοχή σου δεν έχει κατέβει ακόμα, οπότε μόνο τα πολύ κοντινά.
 export function nearby(cat, pos, { limit = 25, strict = false } = {}) {
   const max = strict ? SHOW_NEAR : searchedWide(cat, pos) ? SHOW_MAX_WIDE : SHOW_MAX;
-  // μόνο φρέσκα δεδομένα (λιγότερο από 3 μέρες) από περιοχές κοντά σου
-  const rows = unique(areas.filter((a) => fresh(a) && d(a, pos) < max + 45000).flatMap((a) => a.items.filter((it) => it[0] === cat)));
+  // μόνο από περιοχές κοντά σου (τα παλιότερα από 3 μέρες ανανεώνονται στο παρασκήνιο)
+  const rows = unique(areas.filter((a) => showable(a, pos) && d(a, pos) < max + 45000).flatMap((a) => a.items.filter((it) => it[0] === cat)));
   return rows
     .map((it) => toPlace(it, pos))
     .filter((p) => p.dist <= max)
@@ -224,7 +236,7 @@ export function nearby(cat, pos, { limit = 25, strict = false } = {}) {
 // Για τις προτάσεις όσο γράφεις: μέρη με όνομα που ταιριάζει.
 export function findByName(norm, pos, limit = 5) {
   if (!norm) return [];
-  const rows = unique(areas.filter((a) => fresh(a) && d(a, pos) < SHOW_MAX + 45000).flatMap((a) => a.items.filter((it) => normalize(it[3]).includes(norm))));
+  const rows = unique(areas.filter((a) => showable(a, pos) && d(a, pos) < SHOW_MAX + 45000).flatMap((a) => a.items.filter((it) => normalize(it[3]).includes(norm))));
   return rows
     .map((it) => toPlace(it, pos))
     .filter((p) => p.dist <= SHOW_MAX)
