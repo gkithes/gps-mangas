@@ -41,7 +41,7 @@ function render(key, items, loading) {
     if (!loading) listMessage(list, t("near.none"));
     return;
   }
-  const pin = L.divIcon({ className: "poi-pin", html: `<div>${icon}</div>`, iconSize: [32, 32], iconAnchor: [16, 16] });
+  const pin = L.divIcon({ className: "poi-pin", html: `<div data-key="${key}">${icon}</div>`, iconSize: [32, 32], iconAnchor: [16, 16] });
   for (const p of items) {
     const li = placeRow(icon, p.name || label, p.sub, shortDist(p.dist));
     li.onclick = () => previewDestination(p);
@@ -60,6 +60,7 @@ export async function showNearby(key) {
   button.classList.add("on");
   button.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
   $("places-title").textContent = t("near.title", { icon, label });
+  $("places-panel").dataset.key = key; // χρώμα της κατηγορίας στην κεφαλίδα
 
   const stillHere = () => state.mode === "places" && button.classList.contains("on");
   // πρώτα πού είσαι ΤΩΡΑ (όχι πού ήσουν πριν από λίγα λεπτά)

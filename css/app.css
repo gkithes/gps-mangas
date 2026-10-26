@@ -1,24 +1,56 @@
-/* GPS Μάγκας — εμφάνιση */
+/* GPS Μάγκας — εμφάνιση
+   Φωτεινά, ζεστά χρώματα τη μέρα· σκούρα όταν το κινητό είναι σε σκούρα λειτουργία. */
 
 :root {
-  --bg: #11161d;
-  --card: #1a222c;
-  --card-2: #232d39;
-  --line: #2e3a48;
-  --text: #f2f4f7;
-  --muted: #95a1b2;
-  --accent: #f0a83a;
-  --accent-ink: #1a1206;
-  --blue: #3d8bfd;
-  --green: #0f5d3f;
+  --bg: #f7f3ec;                         /* φόντο φύλλων (ρυθμίσεις κ.λπ.) */
+  --card: rgba(255, 255, 255, .9);       /* κάρτες πάνω στον χάρτη, «γυαλί» */
+  --card-2: #f2ece3;                     /* κουμπιά/πεδία μέσα στις κάρτες */
+  --line: #ece5da;
+  --text: #22252d;
+  --muted: #727784;
+  --accent: #ff8a3d;
+  --accent-2: #ff5f6d;
+  --accent-ink: #fff;
+  --grad-accent: linear-gradient(135deg, #ffb347 0%, #ff7a45 55%, #ff5f6d 100%);
+  --blue: #2f7cf6;
+  --green: #0f8a63;
+  --grad-nav: linear-gradient(135deg, #11a37a 0%, #0c7f66 55%, #0b6b73 100%);
   --danger: #e5484d;
-  --warn: #fbbf24;
-  --radius: 16px;
-  --shadow: 0 6px 24px rgba(0, 0, 0, .35);
-  --shadow-sm: 0 2px 6px rgba(0, 0, 0, .3);
+  --warn: #f59e0b;
+  --radius: 20px;
+  --shadow: 0 10px 30px rgba(34, 37, 45, .16), 0 2px 6px rgba(34, 37, 45, .08);
+  --shadow-sm: 0 3px 10px rgba(34, 37, 45, .14);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12161c;
+    --card: rgba(28, 34, 43, .9);
+    --card-2: #27313d;
+    --line: #313c4a;
+    --text: #f2f4f7;
+    --muted: #9aa5b5;
+    --shadow: 0 10px 30px rgba(0, 0, 0, .45);
+    --shadow-sm: 0 3px 10px rgba(0, 0, 0, .4);
+  }
+}
+
+/* Ένα χρώμα για κάθε κατηγορία «κοντά μου» (κουμπί, καρφίτσα, λίστα). */
+[data-key="fuel"] { --c: #ef4444; }
+[data-key="food"] { --c: #f97316; }
+[data-key="cafe"] { --c: #a16207; }
+[data-key="market"] { --c: #16a34a; }
+[data-key="pharmacy"] { --c: #0d9488; }
+[data-key="parking"] { --c: #2563eb; }
+[data-key="atm"] { --c: #7c3aed; }
+[data-key="ev"] { --c: #65a30d; }
+[data-key="hotel"] { --c: #4f46e5; }
+[data-key="hospital"] { --c: #e11d48; }
+[data-key="carwash"] { --c: #0891b2; }
+[data-key="repair"] { --c: #64748b; }
+[data-key="wc"] { --c: #0284c7; }
 
 /* ---------- βάση: η εφαρμογή γεμίζει ακριβώς την οθόνη, χωρίς κύλιση ή ζουμ σελίδας ---------- */
 
@@ -56,13 +88,18 @@ body.navigating .leaflet-top.leaflet-right { top: calc(var(--safe-top) + 150px);
 }
 .route-label.sel div { background: var(--blue); color: #fff; }
 .poi-pin div {
-  width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 16px;
-  background: #fff; border: 2px solid var(--accent); box-shadow: var(--shadow-sm);
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 16px;
+  background: #fff; border: 3px solid var(--c, var(--accent)); box-shadow: var(--shadow-sm);
 }
 
 /* ---------- κοινά κομμάτια ---------- */
 
-.card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); }
+.card {
+  background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5); backdrop-filter: blur(16px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, .55);
+}
+@media (prefers-color-scheme: dark) { .card { border-color: rgba(255, 255, 255, .06); } }
 .ico { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 .pill { background: var(--card-2); color: var(--text); padding: 11px 16px; border-radius: 999px; font-weight: 600; font-size: 15px; }
@@ -114,7 +151,8 @@ body.navigating #top { display: none; }
 #search .ico { color: var(--muted); flex: none; }
 #search input { flex: 1; min-width: 0; padding: 8px 0; font-size: 17px; background: none; border: 0; outline: none; -webkit-appearance: none; }
 #search input::placeholder { color: var(--muted); }
-.search-go { padding: 10px 16px; border-radius: 999px; font-weight: 700; background: var(--accent); color: var(--accent-ink); }
+.search-go { padding: 10px 18px; border-radius: 999px; font-weight: 800; background: var(--grad-accent); color: var(--accent-ink); box-shadow: 0 4px 12px rgba(255, 106, 69, .35); }
+#search .ico { color: var(--accent); }
 #results { margin-top: 8px; max-height: 45dvh; }
 #results:empty { display: none; }
 .install-tip { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; padding: 12px 12px 12px 14px; font-size: 14px; line-height: 1.4; }
@@ -128,8 +166,16 @@ body.navigating #top { display: none; }
 
 #ribbon { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: -8px -10px; padding: 8px 10px; }
 #ribbon::-webkit-scrollbar { display: none; }
-.chip { flex: none; display: flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px; font-size: 14px; font-weight: 600; white-space: nowrap; background: var(--card); box-shadow: var(--shadow-sm); }
-.chip.on { background: var(--accent); color: var(--accent-ink); }
+.chip {
+  --c: var(--accent);
+  flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; border-radius: 999px;
+  font-size: 14px; font-weight: 700; white-space: nowrap; background: var(--card); box-shadow: var(--shadow-sm);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+.chip span { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 15px;
+  background: color-mix(in srgb, var(--c) 18%, transparent); }
+.chip.on { background: var(--c); color: #fff; }
+.chip.on span { background: rgba(255, 255, 255, .25); }
 
 #drawer { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 #drawer-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 14px 16px; font-weight: 700; font-size: 15px; }
@@ -138,11 +184,13 @@ body.navigating #top { display: none; }
 #drawer-body { display: flex; flex-direction: column; min-height: 0; border-top: 1px solid var(--line); }
 .tabs { display: flex; gap: 6px; padding: 10px 12px 6px; }
 .tabs button { flex: 1; padding: 8px; border-radius: 999px; font-size: 14px; font-weight: 600; background: var(--card-2); color: var(--muted); }
-.tabs button.on { background: var(--text); color: var(--bg); }
+.tabs button.on { background: var(--grad-accent); color: #fff; }
 #saved-list { max-height: 38dvh; }
 
 .panel { display: flex; flex-direction: column; min-height: 0; padding-bottom: 12px; }
-.panel header { display: flex; align-items: center; gap: 8px; padding: 12px 12px 10px 16px; border-bottom: 1px solid var(--line); }
+.panel header { display: flex; align-items: center; gap: 8px; padding: 12px 12px 10px 16px; border-bottom: 1px solid var(--line); border-radius: var(--radius) var(--radius) 0 0; }
+#places-panel header { background: linear-gradient(135deg, color-mix(in srgb, var(--c, var(--accent)) 22%, transparent), transparent 70%); }
+#preview-panel header { background: linear-gradient(135deg, rgba(47, 124, 246, .16), transparent 70%); }
 .panel header h3 { margin: 0; flex: 1; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .panel .titles { flex: 1; min-width: 0; }
 .panel .titles small { display: block; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -160,7 +208,7 @@ body.navigating #top { display: none; }
 .route .line1 { display: flex; align-items: baseline; gap: 10px; }
 .route .time { font-size: 20px; font-weight: 800; }
 .route .dist { font-size: 15px; color: var(--muted); }
-.route .tag { margin-inline-start: auto; font-size: 12px; font-weight: 700; color: #4ade80; }
+.route .tag { margin-inline-start: auto; font-size: 12px; font-weight: 800; color: var(--green); }
 .route .tag.slow { color: var(--muted); }
 .route .via { font-size: 14px; opacity: .9; }
 .route .flags { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -169,7 +217,7 @@ body.navigating #top { display: none; }
 
 /* ---------- πλοήγηση ---------- */
 
-#banner { top: calc(var(--safe-top) + 10px); display: grid; grid-template-columns: 64px 1fr; gap: 4px 14px; padding: 14px 16px; background: var(--green); }
+#banner { top: calc(var(--safe-top) + 10px); display: grid; grid-template-columns: 64px 1fr; gap: 4px 14px; padding: 14px 16px; background: var(--grad-nav); color: #fff; border-color: rgba(255, 255, 255, .18); }
 .maneuver { display: grid; place-items: center; }
 #arrow { width: 56px; height: 56px; }
 #dist { font-size: 30px; font-weight: 800; letter-spacing: -.5px; }
@@ -195,6 +243,9 @@ body.navigating #top { display: none; }
 #navbar { padding: 12px; }
 .trip { display: flex; justify-content: space-around; text-align: center; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
 .trip b { display: block; font-size: 22px; }
+.trip div:nth-child(1) b { color: var(--accent); }
+.trip div:nth-child(2) b { color: var(--blue); }
+.trip div:nth-child(3) b { color: var(--green); }
 .trip span { color: var(--muted); font-size: 12px; }
 .nav-actions { display: flex; gap: 8px; padding-top: 10px; }
 .nav-actions .pill { flex: 1; }

@@ -3,7 +3,7 @@
   "short_name": "GPS Μάγκας",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#11161d",
+  "background_color": "#f7f3ec",
   "theme_color": "#11161d",
   "icons": [
     {
