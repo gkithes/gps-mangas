@@ -12,7 +12,7 @@ import * as POI from "./poi.js";
 import { previewDestination } from "./preview.js";
 import { showNearby } from "./nearby.js";
 import { freshPosition } from "./gps.js";
-import { t } from "./i18n.js";
+import { t, lang } from "./i18n.js";
 
 // ---------- διακομιστές ----------
 
@@ -47,6 +47,31 @@ async function photon(q, from, signal, limit = 8) {
   let res = from ? await run(true) : [];
   if (res.length < 3) res = [...res, ...(await run(false))];
   return from ? byDistance(res, from) : res;
+}
+
+// Esri (ArcGIS): βρίσκει ακριβείς διευθύνσεις («16 sprague hill rd chepachet») που το OpenStreetMap
+// δεν έχει, και καταλαβαίνει συντομογραφίες και ορθογραφικά λάθη. Τα αποτελέσματα είναι ήδη
+// ταξινομημένα από το πιο σωστό, με προτίμηση σε όσα είναι κοντά σου.
+async function arcgis(q, from, signal, limit = 5) {
+  const params = new URLSearchParams({ SingleLine: q, f: "json", maxLocations: String(limit), outFields: "PlaceName,Place_addr,Addr_type", langCode: lang() });
+  if (from) params.set("location", `${from.lng.toFixed(5)},${from.lat.toFixed(5)}`);
+  const data = await getJSON(`${SERVERS.arcgis}?${params}`, { signal }, 6000);
+  return (data.candidates || [])
+    .filter((c) => c.score >= 80 && c.location)
+    .map((c) => {
+      const a = c.attributes || {};
+      const [first, ...rest] = (c.address || "").split(",");
+      const poi = a.Addr_type === "POI" && a.PlaceName;
+      return { lat: c.location.y, lng: c.location.x, name: poi ? a.PlaceName : first.trim(), sub: poi ? a.Place_addr || "" : rest.join(",").trim() };
+    })
+    .filter((p) => !from || distTo(from, p) < 500000); // όχι άλλη ήπειρο
+}
+
+// Διευθύνσεις (ξεκινάνε με αριθμό) πρώτα από το Esri· μαγαζιά/ονόματα πρώτα από το OpenStreetMap.
+const looksLikeAddress = (q) => /^\s*\d+[a-z]?\b/i.test(q);
+async function remoteSearch(q, from, signal, osm) {
+  const [esri, other] = await Promise.all([arcgis(q, from, signal).catch(() => []), osm().catch(() => [])]);
+  return looksLikeAddress(q) ? [...esri, ...other] : [...other.slice(0, 4), ...esri, ...other.slice(4)];
 }
 
 async function nominatim(q, from, signal) {
@@ -255,7 +280,7 @@ $("dest").addEventListener("input", () => {
     const ctrl = (abort = new AbortController());
     let remote = [];
     try {
-      remote = await photon(q, from, ctrl.signal, 6);
+      remote = await remoteSearch(q, from, ctrl.signal, () => photon(q, from, ctrl.signal, 6));
     } catch {}
     if (ctrl.signal.aborted || $("dest").value.trim() !== q) return;
     last = { q, remote };
@@ -287,12 +312,10 @@ $("search").addEventListener("submit", async (e) => {
   const ctrl = (abort = new AbortController());
   let remote = [];
   try {
-    remote = await nominatim(q, from, ctrl.signal);
+    remote = await remoteSearch(q, from, ctrl.signal, async () => {
+      const found = await nominatim(q, from, ctrl.signal).catch(() => []);
+      return found.length ? found : photon(q, from, ctrl.signal);
+    });
   } catch {}
-  if (!remote.length && !ctrl.signal.aborted) {
-    try {
-      remote = await photon(q, from, ctrl.signal);
-    } catch {}
-  }
   if (!ctrl.signal.aborted) render(q, local, [...have, ...remote], { header });
 });

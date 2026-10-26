@@ -46,4 +46,4 @@
 | `js/store.js`, `js/recordings.js` | Ό,τι αποθηκεύεται στο κινητό |
 | `js/config.js` | Διακομιστές και όρια |
 
-Χάρτης: OpenStreetMap · Δορυφόρος: Esri World Imagery · Διαδρομές: OSRM (+ FOSSGIS) · Αναζήτηση: Photon / Nominatim · Κοντινά: Overpass · Leaflet & NoSleep.js (MIT) στο `vendor/`
+Χάρτης: OpenStreetMap · Δορυφόρος: Esri World Imagery · Διαδρομές: OSRM (+ FOSSGIS) · Αναζήτηση: Esri (διευθύνσεις) / Photon / Nominatim · Κοντινά: Overpass · Leaflet & NoSleep.js (MIT) στο `vendor/`
