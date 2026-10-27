@@ -20,7 +20,10 @@ export const DEFAULTS = {
   mode: "both",     // both | quips | plain | mute
   lang: "en",       // γλώσσα ατάκων: en | el | pnt | mix | …
   chime: true,
-  others: "duck",   // άλλος ήχος (μουσική, ράδιο) όσο μιλάει: duck = χαμηλώνει | pause = σταματάει
+  others: "duck",
+  aiKey: "",        // δικό σου κλειδί Claude (μένει μόνο στο κινητό) — χωρίς αυτό ο βοηθός κάνει μόνο εντολές
+  aiModel: "claude-opus-5-5",
+  aiConvo: true,    // μετά από κάθε απάντηση ακούει ξανά μόνο του   // άλλος ήχος (μουσική, ράδιο) όσο μιλάει: duck = χαμηλώνει | pause = σταματάει
   speedLimit: 120,  // πάντα σε χλμ/ώρα
   myAudio: "mix",   // mix | only | off
   drawerOpen: false,

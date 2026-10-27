@@ -1,6 +1,6 @@
 // Ρυθμίσεις που δεν αλλάζει ο χρήστης: διακομιστές και όρια της πλοήγησης.
 
-export const APP_VERSION = "v2.10.0"; // ίδιο με το VERSION στο sw.js
+export const APP_VERSION = "v2.11.0"; // ίδιο με το VERSION στο sw.js
 
 export const SERVERS = {
   route: [
@@ -13,6 +13,8 @@ export const SERVERS = {
   nominatim: "https://nominatim.openstreetmap.org/search",
   // Esri: διευθύνσεις με αριθμό που λείπουν από το OpenStreetMap (π.χ. σε μικρές πόλεις της Αμερικής)
   arcgis: "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
+  arcgisReverse: "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode",
+  photonReverse: "https://photon.komoot.io/reverse",
   overpass: [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",

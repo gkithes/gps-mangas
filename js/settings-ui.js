@@ -88,6 +88,9 @@ const showMode = bind("s-mode", "mode", { onChange: renderMute });
 bind("s-lang", "lang");
 bind("s-chime", "chime");
 bind("s-others", "others");
+bind("s-aiconvo", "aiConvo");
+bind("s-aikey", "aiKey", { parse: (v) => v.trim() });
+bind("s-aimodel", "aiModel");
 bind("s-myaudio", "myAudio");
 renderMute();
 

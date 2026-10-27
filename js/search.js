@@ -74,6 +74,16 @@ async function remoteSearch(q, from, signal, osm) {
   return looksLikeAddress(q) ? [...esri, ...other] : [...other.slice(0, 4), ...esri, ...other.slice(4)];
 }
 
+// Για τον βοηθό: τα καλύτερα αποτελέσματα για ένα όνομα ή μια διεύθυνση.
+export async function searchPlaces(q, from, signal) {
+  const local = localMatches(q, from).map(([, p]) => p);
+  const remote = await remoteSearch(q, from, signal, async () => {
+    const found = await nominatim(q, from, signal).catch(() => []);
+    return found.length ? found : photon(q, from, signal);
+  }).catch(() => []);
+  return [...local, ...remote];
+}
+
 async function nominatim(q, from, signal) {
   const run = async (bounded) => {
     const params = new URLSearchParams({ q, format: "json", limit: "8" });

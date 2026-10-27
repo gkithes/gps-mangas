@@ -79,6 +79,16 @@ function showTrip(along) {
   $("eta-clock").textContent = clockIn(secs);
 }
 
+// Για τον βοηθό: πόσο μένει και ποια είναι η επόμενη οδηγία.
+export function tripInfo() {
+  const r = state.route;
+  if (!state.navigating || !r) return null;
+  const rest = Math.max(0, r.length - lastAlong);
+  const secs = r.length ? (rest / r.length) * r.duration : 0;
+  const step = r.steps[Math.max(1, state.next)] || r.steps[r.steps.length - 1];
+  return { dest: state.dest, rest, secs, next: step ? instruction(step) : "", nextIn: step ? Math.max(0, step.along - lastAlong) : 0 };
+}
+
 // ---------- έναρξη / τέλος ----------
 
 function useRoute(r) {

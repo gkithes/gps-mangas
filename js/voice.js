@@ -83,6 +83,8 @@ function voiceFor(code) {
 const speech = { queue: [], job: null, eventsWork: false };
 
 export function stopSound() {
+  // όποιος περιμένει να τελειώσει η φράση του (ο βοηθός) μαθαίνει ότι σταμάτησε
+  for (const i of [...speech.queue, speech.job?.item]) i?.done?.();
   speech.queue.length = 0;
   if (speech.job) clearTimeout(speech.job.timer);
   speech.job = null;
@@ -94,15 +96,35 @@ export function stopSound() {
 export function speak(text, interrupt = false, code = lang()) {
   if (settings.mode === "mute" || !text || !hasSpeech) return;
   if (interrupt) stopSound();
-  speech.queue.push({ text, code, tries: 0 });
+  speech.queue.push({ text, code, tries: 0, at: Date.now() });
   // στο iPhone, μια φράση αμέσως μετά το cancel() χάνεται — μικρή αναμονή
   setTimeout(pump, interrupt ? 120 : 0);
 }
 
 const longWait = (text) => Math.max(8000, (text.length * 140) / settings.rate);
 
+// Όσο μιλάς στον βοηθό, οι οδηγίες περιμένουν (αλλιώς το μικρόφωνο ακούει την ίδια τη φωνή).
+// Όταν τελειώσεις, όσες έμειναν παλιές (>15″) πετιούνται — η πλοήγηση ξαναλέει την τρέχουσα.
+export function holdSpeech(on) {
+  speech.held = on;
+  if (on) return;
+  speech.queue = speech.queue.filter((i) => i.priority || Date.now() - i.at < 15000);
+  pump();
+}
+export const isSpeaking = () => !!speech.job || (hasSpeech && speechSynthesis.speaking);
+
+// Η απάντηση του βοηθού: μιλάει αμέσως (και όσο οι οδηγίες περιμένουν) και λέει πότε τελείωσε.
+export function sayAndWait(text, code = lang()) {
+  return new Promise((done) => {
+    if (settings.mode === "mute" || !text || !hasSpeech) return done();
+    speech.queue.unshift({ text, code, tries: 0, at: Date.now(), priority: true, done });
+    setTimeout(pump, 0);
+  });
+}
+
 function pump() {
   if (speech.job || !speech.queue.length) return;
+  if (speech.held && !speech.queue[0].priority) return;
   // μην μιλάμε πάνω από δική σου ηχογράφηση
   if (!player.paused && !player.ended && player.dataset.url) return void setTimeout(pump, 300);
   const item = speech.queue.shift();
@@ -113,6 +135,7 @@ function pump() {
     if (speech.job !== job) return;
     clearTimeout(job.timer);
     speech.job = null;
+    item.done?.();
     pump();
   };
   const stuck = () => {
@@ -129,7 +152,7 @@ function pump() {
     if (!job.started && !job.waited && speech.eventsWork && item.tries < 2) {
       item.tries++;
       speech.queue.unshift(item);
-    }
+    } else item.done?.();
     setTimeout(pump, 150);
   };
 

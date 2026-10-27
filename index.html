@@ -62,6 +62,7 @@
 
   <div id="bottom">
     <div class="fabs">
+      <button id="mic" class="fab mic" aria-label="Βοηθός" data-i18n-aria="aria.mic"><svg class="ico" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
       <button id="map-style" class="fab" aria-label="Δορυφόρος">🛰</button>
       <button id="recenter" class="fab" aria-label="Κέντρο" data-i18n-aria="aria.recenter" hidden>
         <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
@@ -240,8 +241,40 @@
           </select>
         </label>
       </section>
+      <section>
+        <h3 data-i18n="set.ai">🎙 Βοηθός</h3>
+        <p class="hint" data-i18n="ai.intro">Πάτα το 🎙 και μίλα: «καφές κοντά μου», «πήγαινέ με στην Ερμού 10», «πόση ώρα μένει», «πού είμαι».</p>
+        <label class="row"><span data-i18n="set.aiConvo">Ακούει ξανά μετά από κάθε απάντηση</span>
+          <input id="s-aiconvo" type="checkbox">
+        </label>
+        <label><span data-i18n="set.aiKey">Κλειδί Claude (προαιρετικό, για ελεύθερη κουβέντα)</span>
+          <input id="s-aikey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…">
+        </label>
+        <label><span data-i18n="set.aiModel">Μοντέλο AI</span>
+          <select id="s-aimodel">
+            <option value="claude-opus-5-5" data-i18n="ai.opus">Claude Opus 5.5 — το πιο έξυπνο</option>
+            <option value="claude-sonnet-5-5" data-i18n="ai.sonnet">Claude Sonnet 5.5 — πιο γρήγορο</option>
+            <option value="claude-haiku-5-5" data-i18n="ai.haiku">Claude Haiku 5.5 — το πιο γρήγορο και φθηνό</option>
+          </select>
+        </label>
+        <p class="hint" data-i18n="ai.keyHint">Κλειδί από το console.anthropic.com (πληρώνεις όσο το χρησιμοποιείς). Μένει μόνο σε αυτό το κινητό.</p>
+      </section>
       <p id="app-version" class="hint version"></p>
     </div>
+  </div>
+
+  <!-- ο βοηθός: κουβέντα με φωνή (ή γραπτά) -->
+  <div id="assistant" class="card" hidden>
+    <div class="as-head">
+      <span id="as-state" aria-live="polite"></span>
+      <button id="as-close" class="icon-btn" aria-label="Κλείσιμο" data-i18n-aria="close">✕</button>
+    </div>
+    <ul id="as-log"></ul>
+    <form id="as-form">
+      <input id="as-input" type="text" autocomplete="off" enterkeyhint="send" placeholder="Ρώτα κάτι…" data-i18n-ph="as.placeholder">
+      <button type="submit" class="pill" aria-label="Στείλε" data-i18n-aria="as.send">➤</button>
+      <button type="button" id="as-talk" class="fab mic small" aria-label="Βοηθός" data-i18n-aria="aria.mic"><svg class="ico" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+    </form>
   </div>
 
   <div id="toast" hidden></div>

@@ -1,7 +1,7 @@
 // Service worker: η εφαρμογή ανοίγει αμέσως από τη μνήμη του κινητού και ενημερώνεται
 // στο παρασκήνιο. Κρατάει και τα κομμάτια του χάρτη που έχεις δει.
 
-const VERSION = "v2.10.0"; // ίδιο με το APP_VERSION στο js/config.js
+const VERSION = "v2.11.0"; // ίδιο με το APP_VERSION στο js/config.js
 const APP = `gps-mangas-app-${VERSION}`;
 const TILES = "gps-mangas-tiles";
 const MAX_TILES = 1500;
@@ -10,7 +10,7 @@ const FILES = [
   "./", "index.html", "manifest.json", "icon.svg", "icon-180.png", "icon-192.png", "icon-512.png", "css/app.css",
   "vendor/leaflet/leaflet.js", "vendor/leaflet/leaflet.css", "vendor/NoSleep.min.js",
   ...["main", "config", "util", "store", "state", "format", "net", "recordings", "poi", "route",
-    "voice", "phrases", "phrases-world", "i18n", "ui", "nav", "gps", "preview", "nearby", "search", "drawer", "settings-ui"].map((m) => `js/${m}.js`),
+    "voice", "phrases", "phrases-world", "i18n", "ui", "nav", "gps", "preview", "nearby", "search", "drawer", "settings-ui", "assistant"].map((m) => `js/${m}.js`),
 ];
 
 self.addEventListener("install", (e) => {

@@ -16,6 +16,7 @@ import "./preview.js";
 import "./nearby.js";
 import "./search.js";
 import "./settings-ui.js";
+import { _assistant } from "./assistant.js";
 
 // Κάθε λάθος καταγράφεται, η εφαρμογή συνεχίζει.
 let lastErrorToast = 0;
@@ -91,4 +92,4 @@ if ("serviceWorker" in navigator) {
 }
 
 // Για τα αυτόματα τεστ.
-window.GPSMangas = { feed, state, places };
+window.GPSMangas = { feed, state, places, assistant: _assistant };
