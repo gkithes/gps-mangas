@@ -10,7 +10,7 @@ import { settings, places } from "./store.js";
 import { state, origin } from "./state.js";
 import { spokenDist, clockIn, useMiles } from "./format.js";
 import { t, lang, locale, isNormalGps } from "./i18n.js";
-import { holdSpeech, sayAndWait, isSpeaking, stopSound } from "./voice.js";
+import { holdSpeech, sayAndWait, isSpeaking, stopSound, micMode } from "./voice.js";
 import { tripInfo, startNavigation, stopNavigation, reannounce, toggleMute } from "./nav.js";
 import { previewDestination } from "./preview.js";
 import { showNearby } from "./nearby.js";
@@ -49,9 +49,11 @@ function open() {
   $("mic").classList.add("on");
 }
 function close() {
-  stopListening();
+  // πρώτα κλείνει η οθόνη — ό,τι κι αν κάνει η αναγνώριση φωνής από κάτω
   panel.hidden = true;
-  $("mic").classList.remove("on");
+  $("mic").classList.remove("on", "listening");
+  $("as-talk").classList.remove("listening");
+  setTimeout(stopListening, 0);
   if (!session) return;
   const cut = session.cut;
   session = null;
@@ -61,59 +63,112 @@ function close() {
 
 // ---------- μικρόφωνο ----------
 
+// Αν η φωνή του Safari αποτύχει δύο φορές στη σειρά, το 🎙 ανοίγει το πληκτρολόγιο:
+// το 🎤 του πληκτρολογίου του iPhone (υπαγόρευση) δουλεύει πάντα.
+const FAIL_KEY = "gps-mangas-mic-fails";
+let fails = +(localStorage.getItem(FAIL_KEY) || 0);
+const setFails = (n) => {
+  fails = n;
+  try {
+    localStorage.setItem(FAIL_KEY, String(n));
+  } catch {}
+};
+
 function stopListening() {
   if (!rec) return;
   const r = rec;
   rec = null;
+  clearTimeout(r.timer);
   try {
     r.abort();
   } catch {}
+  micMode(false);
+}
+
+function typeInstead(msg) {
+  setState(msg);
+  $("as-input").focus();
 }
 
 function listen() {
   open();
   $("as-talk").hidden = !Recognition;
-  if (!Recognition) {
-    setState(t("as.noMic"));
-    $("as-input").focus();
-    return;
-  }
+  if (!Recognition) return typeInstead(t("as.noMic"));
+  if (fails >= 2 && !listen.retry) return typeInstead(t("as.dictate"));
+  listen.retry = false;
   stopListening();
   stopSound(); // σταματάει ό,τι μιλάει, για να μην ακούσει τον εαυτό του
+  micMode(true);
+  setState(t("as.listening"));
+  $("mic").classList.add("listening");
+  $("as-talk").classList.add("listening");
+  // λίγη αναμονή: στο iPhone το μικρόφωνο αμέσως μετά τη φωνή δεν ανοίγει
+  setTimeout(() => panel.hidden || startRecognition(), 250);
+}
+
+function startRecognition() {
   const r = (rec = new Recognition());
   r.lang = locale();
   r.interimResults = true;
   r.maxAlternatives = 1;
   let heard = "";
   let live = null;
-  setState(t("as.listening"));
-  $("mic").classList.add("listening");
-  $("as-talk").classList.add("listening");
+  let done = false;
+  const finish = (failed) => {
+    if (done) return;
+    done = true;
+    clearTimeout(r.timer);
+    $("mic").classList.remove("listening");
+    $("as-talk").classList.remove("listening");
+    if (rec === r) {
+      rec = null;
+      try {
+        r.abort();
+      } catch {}
+      micMode(false);
+    }
+    if (heard) {
+      setFails(0);
+      return handle(heard, live);
+    }
+    if (failed) setFails(fails + 1);
+    if (!panel.hidden) typeInstead(failed ? (fails >= 2 ? t("as.dictate") : t("as.micStuck")) : t("as.tapToTalk"));
+  };
+  // δεν άκουσε τίποτα σε 7″ (ή κόλλησε η αναγνώριση): σταματάμε μόνοι μας
+  const wait = (ms, failed) => {
+    clearTimeout(r.timer);
+    r.timer = setTimeout(() => finish(failed), ms);
+  };
+  wait(7000, true);
   r.onresult = (e) => {
     heard = Array.from(e.results).map((x) => x[0].transcript).join(" ").trim();
     (live ||= bubble("me", "")).textContent = heard;
+    // σταμάτησες να μιλάς (ή ήρθε το τελικό): τελειώνουμε, χωρίς να περιμένουμε το Safari
+    const final = Array.from(e.results).every((x) => x.isFinal);
+    wait(final ? 300 : 1500, false);
   };
   r.onerror = (e) => {
-    if (rec !== r) return;
-    if (e.error === "not-allowed" || e.error === "service-not-allowed") setState(t("as.micDenied"));
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+      setFails(2);
+      done || ((done = true), clearTimeout(r.timer), (rec = null), micMode(false), typeInstead(t("as.micDenied")));
+    } else finish(e.error !== "no-speech" && e.error !== "aborted");
   };
-  r.onend = () => {
-    $("mic").classList.remove("listening");
-    $("as-talk").classList.remove("listening");
-    if (rec !== r) return;
-    rec = null;
-    if (heard) handle(heard, live);
-    else if ($("as-state").textContent === t("as.listening")) setState(t("as.tapToTalk"));
-  };
+  r.onend = () => finish(false);
   try {
     r.start();
   } catch {
-    setState(t("as.noMic"));
+    finish(true);
   }
 }
 
-$("mic").onclick = $("as-talk").onclick = () => {
+$("mic").onclick = () => {
   if (rec) return stopListening();
+  listen();
+};
+// το 🎙 μέσα στον βοηθό δοκιμάζει πάντα τη φωνή (και μετά από αποτυχίες)
+$("as-talk").onclick = () => {
+  if (rec) return stopListening();
+  listen.retry = true;
   listen();
 };
 $("as-close").onclick = close;
@@ -277,11 +332,20 @@ async function offlineCommand(text) {
     const r = await ACTIONS.where_am_i();
     return r.address ? t("as.here", { place: r.address }) : t("as.hereUnknown");
   }
-  const intent = nearbyIntent(s);
-  if (intent) return placesText(await ACTIONS.find_nearby({ category: intent.key }));
   const m = s.match(R.go);
   const target = m && m.slice(1).find(Boolean);
-  if (target) return goText(await ACTIONS.navigate_to({ query: target }), target);
+  if (target) {
+    // «πήγαινέ με στο πιο κοντινό βενζινάδικο» → βρίσκει τα κοντινά και πάει στο πρώτο
+    const want = nearbyIntent(target);
+    if (want?.strong) {
+      const found = await ACTIONS.find_nearby({ category: want.key });
+      if (!found.places?.length) return placesText(found);
+      return goText(await ACTIONS.navigate_to({ query: "first" }), target);
+    }
+    return goText(await ACTIONS.navigate_to({ query: target }), target);
+  }
+  const intent = nearbyIntent(s, { loose: true });
+  if (intent) return placesText(await ACTIONS.find_nearby({ category: intent.key }));
   return t("as.help");
 }
 

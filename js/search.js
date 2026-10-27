@@ -181,13 +181,15 @@ const INTENTS = {
 
 // { key, strong }: strong = σίγουρα ζητάει «κοντά μου» («βενζίνη», «gas near me») → το «Πάμε» ανοίγει τη λίστα.
 // Αλλιώς (π.χ. «Market Street») απλώς προτείνεται, και γίνεται κανονική αναζήτηση.
-export function nearbyIntent(q) {
+// loose: για τον βοηθό με φωνή — «where can I get coffee», «I need gas» (όχι για την αναζήτηση,
+// όπου «Market Street» είναι δρόμος).
+export function nearbyIntent(q, { loose = false } = {}) {
   const norm = normalize(q);
   const asked = norm.match(NEAR_WORDS) != null;
   const rest = norm.replace(NEAR_WORDS, " ").replace(/\b(stations?|a|the|any)\b/g, " ").replace(/\s+/g, " ").trim();
   if (!rest) return null;
   const words = rest.split(" ").length;
-  if (!asked && words > 2) return null;
+  if (!asked && words > 2 && !loose) return null;
   const bare = rest.replace(/(^|\s)ال/g, "$1"); // Αραβικά: «البنزين» = «بنزين»
   for (const [key, stems] of Object.entries(INTENTS)) {
     if (stems.some((st) => [rest, bare].some((r) => r.startsWith(st) || r.includes(" " + st)))) return { key, strong: asked || words === 1 };

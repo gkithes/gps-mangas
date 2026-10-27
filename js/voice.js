@@ -24,6 +24,15 @@ function audioFocus() {
   } catch {}
 }
 
+// Για το μικρόφωνο το iPhone θέλει ήχο «εγγραφής και αναπαραγωγής» — με το «transient» η
+// αναγνώριση φωνής μπορεί να κολλήσει χωρίς λάθος. Μετά επιστρέφουμε στο κανονικό.
+export function micMode(on) {
+  try {
+    if (navigator.audioSession) navigator.audioSession.type = on ? "play-and-record" : "auto";
+  } catch {}
+  if (!on) audioFocus();
+}
+
 // Το iPhone παίζει ήχο μόνο αφού αγγίξεις κάτι: ξεκλείδωμα με το πρώτο άγγιγμα.
 function unlock() {
   audioFocus();
