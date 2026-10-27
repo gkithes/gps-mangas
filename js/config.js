@@ -1,6 +1,6 @@
 // Ρυθμίσεις που δεν αλλάζει ο χρήστης: διακομιστές και όρια της πλοήγησης.
 
-export const APP_VERSION = "v2.9.1"; // ίδιο με το VERSION στο sw.js
+export const APP_VERSION = "v2.10.0"; // ίδιο με το VERSION στο sw.js
 
 export const SERVERS = {
   route: [
@@ -37,7 +37,9 @@ export const NAV = {
   WARN_WALK: [150, 50],
   IDLE_S: 90,
   GPS_LOST_MS: 10000,
-  REROUTE_RETRY_MS: 5000,
+  REROUTE_RETRY_MS: 5000, // πρώτη επανάληψη· μετά 10″, 20″, 30″ όσο δεν ξαναμπαίνεις στη διαδρομή
+  REROUTE_GRACE_MS: 15000, // μετά από νέα διαδρομή: χρόνος να «κουμπώσει» πριν κριθεί ξανά εκτός
+  REPEAT_GAP_MS: 25000,    // η ίδια φράση δεν ξαναλέγεται πιο σύντομα από αυτό
 };
 
 export const SEARCH = {

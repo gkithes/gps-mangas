@@ -86,10 +86,25 @@ function useRoute(r) {
   drawRoute();
 }
 
+// Η ίδια φράση δεν ξαναλέγεται μέσα σε ~25″ (π.χ. μετά από νέα διαδρομή για την ίδια στροφή).
+const saidAt = new Map();
+function notRepeat(text) {
+  const now = Date.now();
+  if (now - (saidAt.get(text) || 0) < NAV.REPEAT_GAP_MS) return false;
+  saidAt.set(text, now);
+  if (saidAt.size > 50) saidAt.delete(saidAt.keys().next().value);
+  return true;
+}
+const speakOnce = (text) => notRepeat(text) && speak(text);
+
+// Όσο η νέα διαδρομή δεν «πιάνει», ρωτάμε όλο και πιο αραιά: 5″, 10″, 20″, 30″.
+export const rerouteDelay = () => Math.min(30000, NAV.REROUTE_RETRY_MS * 2 ** Math.min(state.reroutes, 3));
+
 export function startNavigation(route) {
   setMode("nav");
   state.navigating = true;
   state.follow = true;
+  state.reroutes = 0;
   useRoute(route);
   setStatus("");
   keepAwake(true);
@@ -121,16 +136,22 @@ export async function reroute() {
   if (state.rerouting || !state.dest || !state.pos || !state.navigating) return;
   state.rerouting = true;
   state.lastReroute = Date.now();
+  state.reroutes++;
   if (!state.recalcSpoken) {
     state.recalcSpoken = true;
-    showStep(null, null, quip("recalc", t("say.recalc")));
+    // «Νέα διαδρομή» μία φορά — όχι ξανά σε κάθε επανάληψη μέχρι να ξαναμπείς σε διαδρομή
+    showStep(null, null, state.reroutes === 1 && notRepeat("recalc") ? quip("recalc", t("say.recalc")) : "");
     $("instr").textContent = t("nav.recalc");
   }
   setStatus(t("nav.findingRoute"));
   try {
-    const [r] = await fetchRoutes(state.pos, state.dest, false, state.route?.travel);
+    const fresh = Date.now() - state.headingAt < 30000;
+    const [r] = await fetchRoutes(state.pos, state.dest, false, state.route?.travel, fresh ? state.heading : null);
     if (!state.navigating) return;
     useRoute(r);
+    // η νέα διαδρομή ξεκινάει από το πιο κοντινό σημείο του δρόμου: λίγος χρόνος να «κουμπώσει»
+    state.graceUntil = Date.now() + NAV.REROUTE_GRACE_MS;
+    state.graceFrom = { lat: state.pos.lat, lng: state.pos.lng };
     setStatus("");
     guide(state.pos);
   } catch {
@@ -170,14 +191,18 @@ export function guide(pos) {
 
   // εκτός διαδρομής;
   const loc = locate(route, here);
-  if (loc.off > (walking ? NAV.OFF_ROUTE_WALK_M : NAV.OFF_ROUTE_M) && (pos.accuracy || 0) < 60) {
+  const limit = walking ? NAV.OFF_ROUTE_WALK_M : NAV.OFF_ROUTE_M;
+  // αμέσως μετά από νέα διαδρομή δεν κρίνουμε (εκτός αν είσαι πολύ μακριά ή έχεις ήδη προχωρήσει)
+  const grace = now < state.graceUntil && loc.off < 250 && haversine([state.graceFrom.lat, state.graceFrom.lng], here) < 200;
+  if (loc.off > limit && (pos.accuracy || 0) < 60 && !grace) {
     if (++state.offCount >= NAV.OFF_ROUTE_FIXES) {
       state.offRoute = true;
-      if (now - state.lastReroute > NAV.REROUTE_RETRY_MS) reroute();
+      if (now - state.lastReroute > rerouteDelay()) reroute();
       return;
     }
-  } else {
+  } else if (loc.off <= limit) {
     state.offCount = 0;
+    state.reroutes = 0; // είσαι πάνω στη διαδρομή
     if (state.offRoute) {
       // γύρισες μόνος σου στη διαδρομή
       Object.assign(state, { offRoute: false, recalcSpoken: false });
@@ -227,7 +252,7 @@ export function guide(pos) {
   const say = (dist) => {
     if (settings.mode === "quips") return;
     const ds = spokenDist(dist > 200 ? Math.round(dist / 50) * 50 : dist);
-    speak(step.type === "arrive" ? t("say.arriveIn", { d: ds }) : t("say.inDist", { d: ds, instr: lowerFirst(instr) }));
+    speakOnce(step.type === "arrive" ? t("say.arriveIn", { d: ds }) : t("say.inDist", { d: ds, instr: lowerFirst(instr) }));
   };
 
   // μόλις φανεί νέα στροφή μακριά: «Συνέχισε για 2 χλμ και μετά…» — για να ξέρεις ότι σε ακούει
@@ -235,7 +260,8 @@ export function guide(pos) {
     a.intro = true;
     if (d > warnAt[0] + 150 && settings.mode !== "quips") {
       const then = step.type === "arrive" ? t("say.arriveThen") : lowerFirst(instr);
-      speak(t("say.continueThen", { d: spokenDist(d), then }));
+      // (μετά από νέα διαδρομή για την ίδια στροφή, δεν το ξαναλέει)
+      if (notRepeat(`intro|${then}`)) speak(t("say.continueThen", { d: spokenDist(d), then }));
     }
   }
 
@@ -248,7 +274,7 @@ export function guide(pos) {
 
   if (!a.near && d <= nearDist && step.type !== "arrive") {
     a.near = a.far = true;
-    showStep(step, d, quip(quipCategory(step), instr));
+    showStep(step, d, notRepeat(`near|${instr}|${step.loc}`) ? quip(quipCategory(step), instr) : "");
   } else {
     showStep(step, d);
   }
@@ -258,6 +284,7 @@ export function guide(pos) {
 export function reannounce() {
   if (!state.navigating) return;
   state.announced = {};
+  saidAt.clear(); // εδώ θέλουμε να το ξανακούσεις
   if (state.pos && !state.simTimer) safe(() => guide(state.pos));
 }
 

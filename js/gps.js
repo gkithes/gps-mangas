@@ -5,7 +5,7 @@ import { $, haversine, safe } from "./util.js";
 import { state } from "./state.js";
 import { setStatus, toast, openActions } from "./ui.js";
 import { wakeAudio, stopSound } from "./voice.js";
-import { reroute, reannounce, keepAwake } from "./nav.js";
+import { reroute, rerouteDelay, reannounce, keepAwake } from "./nav.js";
 import { t } from "./i18n.js";
 
 const bootTime = Date.now();
@@ -13,8 +13,22 @@ let handler = () => {};
 export const onPosition = (fn) => (handler = fn);
 
 // Κάθε θέση περνάει από εδώ (GPS, προσομοίωση, τεστ). Ένα λάθος δεν σταματάει τίποτα.
+// Πυξίδα από το A στο B, σε μοίρες (0 = βορράς).
+function bearing(a, b) {
+  const r = Math.PI / 180;
+  const y = Math.sin((b.lng - a.lng) * r) * Math.cos(b.lat * r);
+  const x = Math.cos(a.lat * r) * Math.sin(b.lat * r) - Math.sin(a.lat * r) * Math.cos(b.lat * r) * Math.cos((b.lng - a.lng) * r);
+  return (Math.atan2(y, x) / r + 360) % 360;
+}
+let headFrom = null;
+
 export function feed(pos) {
   state.lastFix = Date.now();
+  // προς τα πού πας: από το GPS όταν κινείσαι, αλλιώς από τις δύο τελευταίες θέσεις (15+ μ μακριά)
+  const moved = headFrom ? haversine([headFrom.lat, headFrom.lng], [pos.lat, pos.lng]) : 0;
+  if (pos.heading != null && pos.heading >= 0 && (pos.speed || 0) > 2) Object.assign(state, { heading: pos.heading, headingAt: state.lastFix });
+  else if (moved > 15 && (pos.accuracy || 0) < 40) Object.assign(state, { heading: bearing(headFrom, pos), headingAt: state.lastFix });
+  if (!headFrom || moved > 15) headFrom = { lat: pos.lat, lng: pos.lng };
   safe(() => handler(pos));
 }
 
@@ -78,7 +92,7 @@ function onFix(p) {
     setStatus("");
     reannounce();
   }
-  feed({ lat, lng, speed, accuracy });
+  feed({ lat, lng, speed, accuracy, heading: p.coords.heading });
   renderLocate();
 }
 
@@ -146,7 +160,7 @@ function watchdog() {
   }
 
   // εκτός διαδρομής και απέτυχε ο υπολογισμός; ξαναδοκίμασε
-  if (state.offRoute && !state.rerouting && now - state.lastReroute > NAV.REROUTE_RETRY_MS) reroute();
+  if (state.offRoute && !state.rerouting && now - state.lastReroute > rerouteDelay()) reroute();
 
   wakeAudio(); // ο ήχος «κοιμήθηκε»;
   keepAwake(true);

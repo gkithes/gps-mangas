@@ -28,6 +28,11 @@ export const state = {
   rerouting: false,
   recalcSpoken: false,
   lastReroute: 0,
+  reroutes: 0,         // νέες διαδρομές στη σειρά χωρίς να ξαναμπείς σε διαδρομή (για αραιότερες επαναλήψεις)
+  graceUntil: 0,       // μέχρι πότε η νέα διαδρομή δεν κρίνεται «εκτός»
+  graceFrom: null,
+  heading: null,       // προς τα πού πας (μοίρες), για νέα διαδρομή προς τη σωστή κατεύθυνση
+  headingAt: 0,
   lastSpeedWarn: 0,
   stillSince: null,
   lastIdleWarn: 0,

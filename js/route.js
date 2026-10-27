@@ -7,12 +7,19 @@ import { t } from "./i18n.js";
 import { settings } from "./store.js";
 
 // travel: "drive" (αυτοκίνητο) ή "walk" (με τα πόδια)
-export async function fetchRoutes(from, to, alternatives = true, travel = settings.travel) {
-  const path = `${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=true&alternatives=${alternatives ? 3 : "false"}`;
+// heading: προς τα πού πας (μοίρες) — η νέα διαδρομή ξεκινάει από τον δρόμο που είσαι, προς τα εκεί που πας,
+// και όχι από τον παράδρομο ή ανάποδα (αυτό έκανε τη νέα διαδρομή να «χάνεται» ξανά και ξανά).
+export async function fetchRoutes(from, to, alternatives = true, travel = settings.travel, heading = null) {
   const servers = travel === "walk" ? SERVERS.walk : SERVERS.route;
-  const data = await getJSON(servers.map((base) => base + path), {}, 10000);
-  if (data.code !== "Ok" || !data.routes?.length) throw new Error(data.message || "no route");
-  return data.routes.map((r) => parseRoute(r, travel)).sort((a, b) => a.duration - b.duration);
+  const ask = async (withHeading) => {
+    let path = `${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=true&alternatives=${alternatives ? 3 : "false"}`;
+    if (withHeading) path += `&bearings=${Math.round(heading) % 360},60;&radiuses=60;`;
+    const data = await getJSON(servers.map((base) => base + path), {}, 10000);
+    if (data.code !== "Ok" || !data.routes?.length) throw new Error(data.message || "no route");
+    return data.routes.map((r) => parseRoute(r, travel)).sort((a, b) => a.duration - b.duration);
+  };
+  if (heading == null || travel === "walk") return ask(false);
+  return ask(true).catch(() => ask(false)); // δεν βρέθηκε δρόμος προς αυτή την κατεύθυνση: χωρίς
 }
 
 function parseRoute(r, travel) {
